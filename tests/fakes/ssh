@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+"""ssh FALSO para pruebas: nunca abre conexiones; emula cellcli con SimBackend."""
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fakecommon import backend, log, run_remote  # noqa: E402
+
+args = sys.argv[1:]
+opts, user, target = [], None, None
+i = 0
+while i < len(args):
+    a = args[i]
+    if a in ("-o", "-l", "-p", "-i", "-F"):
+        if a == "-l":
+            user = args[i + 1]
+        opts.append(args[i + 1])
+        i += 2
+        continue
+    if a.startswith("-"):
+        i += 1
+        continue
+    target = a
+    i += 1
+    break
+remote = " ".join(args[i:])
+if "@" in target:
+    user, host = target.split("@", 1)
+else:
+    host = target
+if "BatchMode=yes" not in opts:
+    log({"tool": "ssh", "host": host, "remote": remote, "violation": True, "reason": "sin BatchMode"})
+    sys.stderr.write("fake: BatchMode=yes obligatorio\n")
+    sys.exit(1)
+out, err, rc = run_remote(backend(), "ssh", user, host, remote)
+sys.stdout.write(out)
+sys.stderr.write(err)
+sys.exit(rc)

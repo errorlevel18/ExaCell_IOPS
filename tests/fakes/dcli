@@ -1,0 +1,39 @@
+#!/usr/bin/env python3
+"""dcli FALSO para pruebas: -g grupo -l usuario 'comando'. Prefija 'celda: ' como dcli."""
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _fakecommon import backend, log, run_remote  # noqa: E402
+
+args = sys.argv[1:]
+group = user = None
+rest = []
+i = 0
+while i < len(args):
+    if args[i] == "-g":
+        group = args[i + 1]; i += 2; continue
+    if args[i] == "-l":
+        user = args[i + 1]; i += 2; continue
+    if args[i] in ("--serial", "-v", "-t"):
+        i += 1; continue
+    rest.append(args[i]); i += 1
+remote = " ".join(rest)
+be = backend()
+cells = [l.strip() for l in open(group) if l.strip() and not l.strip().startswith("#")]
+rc_total = 0
+fail = {f.get("cell") for f in be.cfg.failures.get("prevalidate", [])}
+for c in cells:
+    if c in fail:
+        log({"tool": "dcli", "user": user, "host": c, "remote": remote, "violation": False})
+        sys.stderr.write(f"{c}: ssh: connect to host {c} port 22: No route to host\n")
+        rc_total = 1
+        continue
+    out, err, rc = run_remote(be, "dcli", user, c, remote)
+    for line in out.splitlines():
+        sys.stdout.write(f"{c}: {line}\n")
+    for line in err.splitlines():
+        sys.stderr.write(f"{c}: {line}\n")
+    if rc:
+        rc_total = 1
+sys.exit(rc_total)

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "exacell-sizer"
+version = "0.1.0"
+description = "Evaluación prudente del número de celdas de almacenamiento Exadata a partir de capturas CellCLI del origen"
+requires-python = ">=3.9"
+dependencies = []          # núcleo solo con biblioteca estándar
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+exacell-sizer = "exacell_sizer.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+exacell_sizer = ["resources/*.sh", "catalog/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
