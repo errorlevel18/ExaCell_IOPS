@@ -35,3 +35,18 @@ con una respuesta comprensible, trazable y prudente.
 | 7 | E2E (recolector real + simulador → importación → dimensionamiento → informes), limitaciones | pytest e2e |
 
 El estado de cada fase y las limitaciones conocidas están en `docs/LIMITACIONES.md` y en el README.
+
+## Estado (2026-11-10)
+
+| Fase | Estado | Pruebas |
+|------|--------|---------|
+| 0 Esqueleto y CLI | Completada | `--help`, `collector show/info/export` |
+| 1 Recolector + simulador | Completada | `tests/test_collector.py` (27): 1/3/7 celdas, prevalidación dcli y SSH, CellCLI, red, interrumpido, vacío, celda perdida a mitad, 24 bloques y límites horarios, sintaxis `NOT <`, solo `LIST`, sin escrituras en celdas, root/celladmin, errores de uso, `-n`, SHA-256, SIGTERM |
+| 2 Importación | Completada | `tests/test_importer.py` (25): Decimal exacto, UTC, procedencia archivo/línea, inmutabilidad, reimportación, bloques fallidos ≠ cero, manipulación, huecos de plan, duplicados y límite horario, unidades/definiciones/no numéricos, `.tar.gz` y path traversal, equivalencia con la salida del script real |
+| 3 Catálogo | Completada | `tests/test_catalog.py` (12): integridad, PMEM/XRMEM ≠ flash, mirroring, HDD derivado, X6 Eighth, EF/XT, conversión, modelos desconocidos y aproximaciones, 265/265 cifras en su página (con `EXACELL_DATASHEETS`) |
+| 4 Análisis | Completada | `tests/test_analysis.py` (12): contadores con reinicio/hueco, minutos incompletos, suma = muestras, no aplicable/no disponible, no sumables, latencia ponderada, KB→MB, persistencia, combinación coincidente/envolvente/sin solape/hora del día, calendario |
+| 5 Motor | Completada | `tests/test_sizing.py` (23): sí/no/insuficiente con cifras exactas, margen y cuello de botella, cobertura, captura incompleta y corta, aproximaciones, EF con HDD, N-1, multirack, red nominal, servidores de BD, combinación, crecimiento/percentil, aprobación operativa con capacidad probada, validación de escenario, reparto por celda, red ausente no bloquea, lecturas PMEM/XRMEM del origen |
+| 6 Informes | Completada | `tests/test_reports.py` (7): SQLite = series.csv (es y c), JSON = agregados.csv = MD = HTML, dimensionamiento CSV/JSON/MD/HTML, HTML autocontenido y etiquetas de referencia, guía y LEEME |
+| 7 E2E y documentación | Completada | `tests/test_e2e.py` (5): recolector Bash real → CLI import → size → informes (completa y con bloque fallido), distintos números de celdas origen/destino, CLI de catálogo y recolector |
+
+Limitaciones: ver `docs/LIMITACIONES.md`. No se ha usado ninguna captura real (no se proporcionó).

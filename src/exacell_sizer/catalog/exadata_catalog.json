@@ -153,7 +153,8 @@
   "read_iops_memory_tier_as_flash": "Usar la cifra 'Maximum SQL Read IOPS' de X8M/X9M (PMEM) o X10M/X11M (XRMEM) como referencia de lecturas pequeñas observadas en flash. La cifra publicada se alcanza leyendo de memoria persistente/RDMA, no de flash: puede sobreestimar la capacidad de lectura flash.",
   "hdd_iops_from_rack": "Usar la cifra de IOPS HDD derivada (rack / nº de celdas) como capacidad por celda: supone escalado lineal y reparto uniforme; la mezcla lectura/escritura no está publicada.",
   "small_io_as_8k": "Comparar las peticiones 'pequeñas' de CellCLI (<=128 KB) con la cifra publicada para E/S de 8 KB. Si el tamaño medio real es mayor que 8 KB la capacidad real en IOPS es menor.",
-  "hdd_load_to_flash": "Trasladar la carga HDD del origen (lecturas/escrituras pequeñas y MB/s de lectura) a flash en un destino sin HDD (EF). Supone que las mismas E/S se sirven desde flash con el mismo tamaño; no modela cambios de caché ni de patrón de acceso."
+  "hdd_load_to_flash": "Trasladar la carga HDD del origen (lecturas/escrituras pequeñas y MB/s de lectura) a flash en un destino sin HDD (EF). Supone que las mismas E/S se sirven desde flash con el mismo tamaño; no modela cambios de caché ni de patrón de acceso.",
+  "source_memory_tier_reads_unobserved": "Aceptar que, en un ORIGEN X8M o posterior, las lecturas servidas desde PMEM/XRMEM no se observan en los celldisks flash recogidos: la demanda de lectura medida puede estar infraestimada."
  },
  "models": [
   {

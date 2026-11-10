@@ -254,6 +254,23 @@ def _quality_gates(src: CaptureAnalysis, dst: Optional[CaptureAnalysis], sc: dic
         warnings.extend(f"[{name}] {w}" for w in a.calendar["warnings"])
     if not sc["critical_periods_confirmed"]:
         warnings.append("Periodos críticos (picos semanales, cierres, backups) no confirmados por el cliente.")
+    srcsys = sc.get("source_system") or {}
+    if not srcsys.get("model"):
+        warnings.append("Modelo del origen no declarado (source_system): si es X8M o posterior, las lecturas servidas "
+                        "desde PMEM/XRMEM no aparecen en los celldisks y la demanda de lectura puede estar infraestimada.")
+    else:
+        try:
+            from . import catalog as _c
+            m, _ = _c.load().resolve(srcsys["model"], sc["approximations"])
+            if m["read_iops_tier"] != "flash":
+                msg = (f"El origen {m['model']} sirve lecturas desde {m['read_iops_tier'].upper()}, que no se observan en "
+                       "los celldisks recogidos: la demanda de lectura puede estar infraestimada.")
+                if "source_memory_tier_reads_unobserved" in sc["approximations"]:
+                    warnings.append("APROXIMACIÓN 'source_memory_tier_reads_unobserved': " + msg)
+                else:
+                    blocking.append(msg + " Requiere la aceptación explícita 'source_memory_tier_reads_unobserved'.")
+        except Exception as e:  # modelo origen desconocido: solo advertencia
+            warnings.append(f"Modelo del origen no resoluble en el catálogo: {e}")
     if sc["allow_short_capture_for_testing"]:
         warnings.insert(0, "MODO PRUEBA: se admiten capturas cortas; el resultado no sirve para decidir una compra "
                            "ni una migración.")
@@ -522,8 +539,10 @@ def _resource(r, ds: DemandSeries, refs, unav, sc, cand, model, stype, growth, m
         rr.reason = "sin dispositivos de este tipo en el origen (demanda nula por inexistencia, no por omisión)"
         return rr
     if ds.src_status not in ("OK", "NOT_APPLICABLE"):
-        rr.status, rr.blocking = "no_evaluable", True
+        rr.status, rr.blocking = "no_evaluable", r != "network_mbps"
         rr.reason = f"demanda del origen no disponible: {ds.src_reason}"
+        if r == "network_mbps":
+            rr.reason += " (techo nominal no comprobado; no bloquea el dictamen)"
         return rr
     if ds.dst is not None and ds.dst_status not in ("OK", "NOT_APPLICABLE"):
         rr.status, rr.blocking = "no_evaluable", True

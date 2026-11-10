@@ -266,3 +266,22 @@ def test_per_cell_distribution_any_cell_count(ncells):
     for x in c.resources:
         if x.per_cell_demand is not None:
             assert x.per_cell_demand == (x.design_demand / 4).quantize(D("0.001"))
+
+
+def test_network_missing_does_not_block():
+    [c] = run(fa(unavailable=("network_mbps",)), [{"id": "a", "model": "X7-2", "storage_type": "HC"}])
+    assert c.verdict == VERDICT_OK
+    assert res(c, "network_mbps").status == "no_evaluable" and not res(c, "network_mbps").blocking
+
+
+def test_source_memory_tier_reads_unobserved():
+    cand = [{"id": "a", "model": "X7-2", "storage_type": "HC"}]
+    [c] = run(fa(), cand, source_system={"model": "X9M-2", "storage_type": "HC"})
+    assert c.verdict == VERDICT_INSUFFICIENT and any("PMEM" in b for b in c.blocking)
+    [c] = run(fa(), cand, source_system={"model": "X9M-2", "storage_type": "HC"},
+              approximations=["source_memory_tier_reads_unobserved"])
+    assert c.verdict == VERDICT_OK and any("infraestimada" in w for w in c.warnings)
+    [c] = run(fa(), cand, source_system={"model": "X7-2", "storage_type": "HC"})
+    assert c.verdict == VERDICT_OK
+    [c] = run(fa(), cand)
+    assert any("no declarado" in w for w in c.warnings)
