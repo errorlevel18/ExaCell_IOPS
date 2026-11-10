@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+"""ssh FALSO hacia un dbnode (solo pruebas): ejecuta el comando remoto EN LOCAL con bash.
+
+Dentro del "dbnode" el PATH incluye tests/fakes (dcli/ssh falsos de las celdas), de modo que el
+recolector real se ejecuta completo sin ningún Exadata. Variables:
+  FAKE_DBNODE_LOG          jsonl con cada llamada
+  FAKE_DBNODE_UNKNOWN      "1": la clave del host no está en known_hosts (salvo accept-new)
+  FAKE_DBNODE_PASSWORD     si se define, exige autenticación por contraseña (vía SSH_ASKPASS)
+"""
+import json
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+FAKES = HERE.parent / "fakes"
+
+args = sys.argv[1:]
+opts, i = {}, 0
+while i < len(args):
+    a = args[i]
+    if a in ("-o",):
+        k, _, v = args[i + 1].partition("=")
+        opts[k] = v
+        i += 2
+        continue
+    if a in ("-p", "-i", "-l", "-F"):
+        opts[a] = args[i + 1]
+        i += 2
+        continue
+    if a.startswith("-"):
+        i += 1
+        continue
+    break
+target, remote = args[i], " ".join(args[i + 1:])
+user, _, host = target.partition("@")
+
+
+def log(**kw):
+    p = os.environ.get("FAKE_DBNODE_LOG")
+    if p:
+        with open(p, "a") as fh:
+            fh.write(json.dumps(dict(ts=time.time(), user=user, host=host, opts=opts, remote=remote, **kw)) + "\n")
+
+
+def die(msg, rc=255):
+    log(result="refused", reason=msg)
+    sys.stderr.write(msg + "\n")
+    sys.exit(rc)
+
+
+if opts.get("StrictHostKeyChecking") not in ("yes", "accept-new"):
+    die("fake: StrictHostKeyChecking debe ser yes o accept-new")
+if os.environ.get("FAKE_DBNODE_UNKNOWN") == "1" and opts.get("StrictHostKeyChecking") != "accept-new":
+    die(f"No ED25519 host key is known for {host} and you have requested strict checking.\nHost key verification failed.")
+pw = os.environ.get("FAKE_DBNODE_PASSWORD")
+if pw:
+    if opts.get("BatchMode") != "no" or not os.environ.get("SSH_ASKPASS"):
+        die(f"{user}@{host}: Permission denied (publickey,password).")
+    given = subprocess.run([os.environ["SSH_ASKPASS"]], capture_output=True, text=True).stdout.rstrip("\n")
+    if given != pw:
+        die(f"{user}@{host}: Permission denied (publickey,password).")
+elif opts.get("BatchMode") != "yes":
+    die("fake: sin contraseña configurada se espera BatchMode=yes")
+if host == "noexiste":
+    die(f"ssh: Could not resolve hostname {host}: Name or service not known")
+
+env = dict(os.environ)
+env["PATH"] = f"{FAKES}:{env['PATH']}"
+env.pop("EXACELL_SSH_PASSWORD", None)  # el "dbnode" no ve la contraseña
+log(result="exec")
+p = subprocess.run(["bash", "-c", remote], stdin=sys.stdin.buffer, env=env)
+sys.exit(p.returncode)

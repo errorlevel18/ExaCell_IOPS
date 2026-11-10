@@ -31,6 +31,7 @@ from ..metrics import MEASURE_BY_ID
 from ..simulate import SimConfig, write_capture
 from ..sizing import RESOURCE_LABELS, RESOURCE_MEASURES, evaluate
 from ..svgchart import downsample_max
+from .remote_ops import RemoteOps
 
 ALLOWED_UPLOAD = (".tar.gz", ".tgz", ".tar", ".zip")
 SAFE = re.compile(r"[^A-Za-z0-9._-]+")
@@ -44,7 +45,9 @@ def _jsonable(o):
     return json.loads(json.dumps(o, default=lambda x: format(x, "f") if isinstance(x, Decimal) else str(x)))
 
 
-class Workspace:
+class Workspace(RemoteOps):
+    SAFE = SAFE
+
     def __init__(self, root: str):
         self.root = Path(root).resolve()
         for d in ("uploads", "extracted", "simulated", "runs"):
@@ -54,6 +57,8 @@ class Workspace:
         self._lock = threading.Lock()          # serializa escrituras pesadas en SQLite
         self._analyses: Dict[int, CaptureAnalysis] = {}
         self.catalog = catmod.load()
+        self._passwords: Dict[str, str] = {}   # contraseñas SSH: solo en memoria, nunca en disco
+        self._remote_lock = threading.Lock()
 
     def warm_up(self) -> None:
         """Precalcula en segundo plano el análisis de las capturas existentes."""
@@ -352,3 +357,5 @@ class Jobs:
 
     def get(self, jid: str) -> Optional[dict]:
         return self._jobs.get(jid)
+
+

@@ -56,3 +56,15 @@
 
 - Importación ≈ 150.000 líneas/s en un PC moderno (≈ 1 min por 14 celdas × 24 h). `series.csv`
   puede ocupar decenas de MB por captura.
+
+## Recogida por SSH desde la aplicación
+
+- Probada únicamente contra un **dbnode simulado** (`tests/fakes_dbnode/ssh_dbnode`, que ejecuta en
+  local el recolector real con celdas simuladas). No se ha probado contra un dbnode real.
+- La autenticación por contraseña usa `SSH_ASKPASS` + `SSH_ASKPASS_REQUIRE=force` (OpenSSH ≥ 8.4).
+  En clientes OpenSSH antiguos o en algunas versiones de Windows puede no funcionar: use clave.
+- La comprobación de que el PID sigue siendo el recolector usa `/proc/<pid>/cmdline` (Linux, como
+  los dbnodes Exadata).
+- Si se pierde la conexión durante la descarga, basta con repetir «Descargar e importar»: la
+  captura sigue en el dbnode. La aplicación no borra nada en el dbnode (script, log y captura
+  quedan en el directorio indicado para su revisión o limpieza manual).

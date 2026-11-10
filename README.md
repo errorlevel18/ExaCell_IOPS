@@ -37,6 +37,25 @@ Opciones: `--port`, `--host`, `--no-browser`.
 | **Catálogo Exadata** | Cifras por modelo y tipo de celda con evidencia, fuente y página |
 | **Guía** | Interpretación de informes, metodología, limitaciones y recolector |
 
+### Recogida por SSH desde la aplicación
+
+Si el PC tiene acceso SSH al dbnode, la sección **Recogida SSH** evita el ida y vuelta de archivos:
+
+1. **Conexión** (host, usuario, agente/clave/contraseña) y **Probar conexión**: comprueba `dcli`,
+   `sha256sum`, el directorio y el `cell_group` en el dbnode, y lista las celdas.
+2. **Simulación (-n)** y **Iniciar recolección**: copia el recolector al directorio indicado del
+   dbnode (verificado por SHA-256) y lo ejecuta en segundo plano con `nohup`; sigue aunque se
+   cierre la aplicación.
+3. **Progreso** por bloques, log, **Cancelar** (la captura queda INTERRUPTED) y **Descargar e
+   importar** al terminar (tar por SSH, sin temporales en el dbnode).
+4. **Traer una captura ya ejecutada** por el cliente: lista `exacell_capture_*` y la descarga.
+
+La aplicación se conecta **solo al dbnode**; es el recolector quien consulta las celdas en solo
+lectura. Usa el cliente OpenSSH del sistema (Windows 10/11, Linux, macOS) con su
+`~/.ssh/config`, agente y `known_hosts`; una clave de host nueva solo se acepta si se marca
+expresamente. Las contraseñas solo se guardan en memoria (requiere OpenSSH ≥ 8.4 para
+`SSH_ASKPASS_REQUIRE`); se recomienda autenticación por clave.
+
 Para probar sin datos reales: **Capturas → Captura simulada de demostración** (origen y otra con
 rol «Destino actual»), y después **Dimensionamiento → Cargar ejemplo → Ejecutar**.
 

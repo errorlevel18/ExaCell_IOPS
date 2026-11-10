@@ -19,6 +19,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from .. import __version__
 from .. import collector as coll
+from ..remote import RemoteError, ssh_binary
 from ..sizing import ScenarioError, load_scenario
 from .workspace import Jobs, Workspace
 
@@ -204,6 +205,13 @@ def make_handler(ws: Workspace, jobs: Jobs):
                                        "script": coll.script_text()})
                 if path == "/api/collector/download":
                     return self._file(coll.script_path(), "exacell_collect.sh")
+                if path == "/api/ssh/info":
+                    try:
+                        return self._json({"available": True, "ssh": ssh_binary()})
+                    except RemoteError as e:
+                        return self._json({"available": False, "error": str(e)})
+                if path == "/api/ssh/runs":
+                    return self._json(ws.ssh_runs())
                 if path == "/api/scenario/default":
                     return self._json(DEFAULT_SCENARIO)
                 if path == "/api/scenario/example":
@@ -258,14 +266,50 @@ def make_handler(ws: Workspace, jobs: Jobs):
                         return self._error(400, "seleccione la captura de origen")
                     jid = jobs.start("sizing", ws.run_sizing, scenario, body["source"], body.get("dest"))
                     return self._json({"job": jid}, 202)
+                if path.startswith("/api/ssh/"):
+                    return self._ssh_post(path)
                 if path == "/api/scenario/validate":
                     load_scenario(self._body_json().get("scenario") or {})
                     return self._json({"ok": True})
                 return self._error(404, "no encontrado")
             except ScenarioError as e:
                 return self._error(400, f"Escenario no válido: {e}")
+            except RemoteError as e:
+                return self._error(502, str(e))
+            except FileNotFoundError:
+                return self._error(404, "no encontrado")
             except (ValueError, json.JSONDecodeError) as e:
                 return self._error(400, str(e))
+
+        def _ssh_post(self, path):
+            b = self._body_json()
+            conn = b.get("conn") or {}
+            pwd = (b.get("conn") or {}).get("password") or b.get("password")
+            if path == "/api/ssh/test":
+                return self._json(ws.ssh_test(conn, b.get("dir", ""), b.get("group", "")))
+            if path == "/api/ssh/dryrun":
+                return self._json(ws.ssh_dryrun(conn, b.get("params") or {}))
+            if path == "/api/ssh/start":
+                return self._json(ws.ssh_start(conn, b.get("params") or {}), 201)
+            if path == "/api/ssh/captures":
+                return self._json(ws.ssh_list_captures(conn, b.get("dir", "")))
+            if path == "/api/ssh/fetch":
+                role = b.get("role", "origen")
+                if role not in ("origen", "destino", "otro"):
+                    return self._error(400, "rol no válido")
+                jid = jobs.start("ssh_fetch", ws.ssh_fetch, conn, b.get("dir", ""), b.get("name", ""),
+                                 (b.get("label") or "").strip() or None, role)
+                return self._json({"job": jid}, 202)
+            m = re.fullmatch(r"/api/ssh/runs/(r[0-9T]+_[0-9a-f]{4})/(status|cancel|import)", path)
+            if m:
+                rid, action = m.groups()
+                if action == "status":
+                    return self._json(ws.ssh_status(rid, pwd))
+                if action == "cancel":
+                    return self._json(ws.ssh_cancel(rid, pwd))
+                jid = jobs.start("ssh_import", ws.ssh_import_run, rid, pwd)
+                return self._json({"job": jid}, 202)
+            return self._error(404, "no encontrado")
 
     return Handler
 

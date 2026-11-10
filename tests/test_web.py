@@ -218,3 +218,23 @@ def test_browser_user_flow(tmp_path):
         assert r.stdout.startswith("OK")
     finally:
         httpd.shutdown()
+
+
+@pytest.mark.skipif(not _node_playwright(), reason="requiere node + playwright")
+def test_browser_ssh_flow(tmp_path, monkeypatch):
+    rdir = tmp_path / "dbnode" / "capturas"
+    rdir.mkdir(parents=True)
+    group = tmp_path / "dbnode" / "cell_group"
+    group.write_text("cel01\ncel02\n")
+    sim = tmp_path / "sim.json"
+    sim.write_text(json.dumps({"cells": ["cel01", "cel02"], "hdd_per_cell": 2, "flash_per_cell": 1}))
+    monkeypatch.setenv("EXACELL_SSH_BIN", str(ROOT / "tests" / "fakes_dbnode" / "ssh_dbnode"))
+    monkeypatch.setenv("FAKE_EXA_CONFIG", str(sim))
+    httpd, ws, jobs = make_server(str(tmp_path / "ws"), port=0)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        r = subprocess.run(["node", str(ROOT / "tests" / "web_ssh_flow.js"), f"http://127.0.0.1:{httpd.server_address[1]}",
+                            str(rdir), str(group), ""], capture_output=True, text=True, timeout=600)
+        assert r.returncode == 0, r.stdout + r.stderr
+    finally:
+        httpd.shutdown()

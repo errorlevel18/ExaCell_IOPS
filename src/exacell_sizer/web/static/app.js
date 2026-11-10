@@ -61,6 +61,7 @@
   const routes = [
     [/^#?\/?$/, 'dashboard', pageDashboard],
     [/^#\/recolector$/, 'collector', pageCollector],
+    [/^#\/ssh$/, 'ssh', pageSSH],
     [/^#\/capturas$/, 'captures', pageCaptures],
     [/^#\/capturas\/(\d+)$/, 'captures', pageCapture],
     [/^#\/dimensionamiento$/, 'sizing', pageSizing],
@@ -91,7 +92,7 @@
     const complete = caps.filter((c) => c.import_status === 'COMPLETE').length;
     const real = caps.filter((c) => !c.simulated).length;
     const steps = [
-      ['Descargar el recolector', 'Genere el comando y entregue el script al cliente para ejecutarlo en un dbnode del origen (24 h o más).', '#/recolector', 'Abrir recolector', false],
+      ['Recoger la carga del origen', 'Entregue el script al cliente para ejecutarlo en un dbnode (24 h o más) o lance la recogida por SSH desde aquí.', '#/recolector', 'Abrir recolector', false],
       ['Subir la captura', 'Suba el .tar.gz/.zip que entrega el cliente. Se valida integridad, bloques, huecos y unidades.', '#/capturas', 'Subir captura', caps.length > 0],
       ['Revisar carga y cobertura', 'Compruebe picos, minutos completos por celda, incidencias y avisos de calendario.', caps.length ? `#/capturas/${caps[0].id}` : '#/capturas', 'Ver captura', caps.length > 0],
       ['Dimensionar candidatos', 'Defina crecimiento, reserva, N-1 y configuraciones Exadata candidatas. Obtenga el dictamen.', '#/dimensionamiento', 'Dimensionar', runs.length > 0],
@@ -121,6 +122,7 @@
         <h3>Prueba sin contactar celdas (simulación)</h3><div class="cmd"><pre id="cmdDry"></pre><button class="btn ghost small" data-copy="cmdDry">Copiar</button></div>
         <h3>Ejecución real</h3><div class="cmd"><pre id="cmdRun"></pre><button class="btn ghost small" data-copy="cmdRun">Copiar</button></div>
         <h3>Empaquetar para entregar</h3><div class="cmd"><pre id="cmdTar"></pre><button class="btn ghost small" data-copy="cmdTar">Copiar</button></div>
+        <div class="callout ok small">¿Tiene acceso SSH al dbnode? En <a href="#/ssh">Recogida SSH</a> la aplicación puede ejecutar este mismo script en el dbnode y traer la captura automáticamente.</div>
         <div class="callout info small">Después, suba el <span class="mono">.tar.gz</span> en <a href="#/capturas">Capturas</a>. No modifique la carpeta de captura: sus sumas SHA-256 se verifican al importar.</div></div>
       <div class="card"><h2>2 · Qué hace y qué garantiza</h2><ul class="small">
         <li><b>Prevalida todas las celdas</b> con <span class="mono">dcli</span> y SSH antes de recoger nada; si alguna falla no recoge histórico (código 2).</li>
@@ -149,6 +151,123 @@
     $$('[data-copy]').forEach((b) => b.addEventListener('click', async () => {
       try { await navigator.clipboard.writeText($('#' + b.dataset.copy).textContent); toast('Copiado al portapapeles'); } catch { toast('No se pudo copiar', true); }
     }));
+  }
+
+  // ------------------------------------------------------------------ Recogida SSH
+  const SSH_KEY = 'exacell-ssh-form';
+  function sshForm() { try { return JSON.parse(localStorage.getItem(SSH_KEY) || '{}'); } catch { return {}; } }
+  function saveSshForm(f) { try { const c = { ...f }; delete c.password; localStorage.setItem(SSH_KEY, JSON.stringify(c)); } catch { } }
+  async function pageSSH() {
+    const info = await api('/api/ssh/info');
+    const f = Object.assign({ host: '', port: 22, user: 'oracle', auth: 'agent', key_path: '', accept_new: false, dir: '/home/oracle/capturas', group: '/home/oracle/cell_group', cell_user: 'celladmin', tz: '+01:00', dur: 24, parallel: 4, label: '', role: 'origen' }, sshForm());
+    const d = new Date(); d.setUTCDate(d.getUTCDate() - 1); d.setUTCHours(0, 0, 0, 0);
+    view.innerHTML = head('Recogida por SSH', 'La aplicación se conecta <b>solo al dbnode</b> y ejecuta allí el recolector de solo lectura; después descarga e importa la captura.')
+      + (info.available ? '' : `<div class="callout crit">${esc(info.error)}</div>`)
+      + `<div class="grid g2"><div class="card"><h2>1 · Conexión al dbnode</h2><div class="form-grid">
+          <label class="f">Host del dbnode<input id="sHost" value="${esc(f.host)}" placeholder="exadb01.midominio"></label>
+          <label class="f">Puerto<input id="sPort" type="number" value="${esc(f.port)}"></label>
+          <label class="f">Usuario del dbnode<input id="sUser" value="${esc(f.user)}"></label>
+          <label class="f">Autenticación<select id="sAuth"><option value="agent">Agente / clave por defecto</option><option value="key">Archivo de clave privada</option><option value="password">Contraseña</option></select></label>
+          <label class="f" id="wKey">Archivo de clave (en este PC)<input id="sKey" value="${esc(f.key_path)}" placeholder="C:\\Users\\yo\\.ssh\\id_ed25519"></label>
+          <label class="f" id="wPwd">Contraseña <span class="muted tiny">(solo en memoria)</span><input id="sPwd" type="password" autocomplete="off"></label>
+          <label class="f">Directorio en el dbnode<input id="sDir" value="${esc(f.dir)}"></label>
+          <label class="f">cell_group en el dbnode<input id="sGroup" value="${esc(f.group)}"></label></div>
+          <label class="check" style="margin-top:10px"><input type="checkbox" id="sNew" ${f.accept_new ? 'checked' : ''}>Aceptar la clave del host si es nueva (se añade a known_hosts de este PC). Verifique antes la huella con el administrador.</label>
+          <div class="btn-row" style="margin-top:12px"><button class="btn" id="sTest">Probar conexión</button></div><div id="sTestOut" style="margin-top:10px"></div></div>
+        <div class="card"><h2>2 · Lanzar la recolección</h2><div class="form-grid">
+          <label class="f">Usuario en las celdas<select id="sCellUser"><option ${f.cell_user === 'celladmin' ? 'selected' : ''}>celladmin</option><option ${f.cell_user === 'root' ? 'selected' : ''}>root</option></select></label>
+          <label class="f">Inicio<input id="sStart" type="datetime-local" step="3600" value="${d.toISOString().slice(0, 16)}"></label>
+          <label class="f">Zona horaria<select id="sTz">${['+00:00', '+01:00', '+02:00', '-03:00', '-04:00', '-05:00', '-06:00', '+05:30', '+08:00'].map((z) => `<option ${z === f.tz ? 'selected' : ''}>${z}</option>`).join('')}</select></label>
+          <label class="f">Duración<select id="sDur">${[[2, '2 horas (solo prueba)'], [24, '24 horas'], [48, '48 horas'], [72, '72 horas'], [168, '7 días']].map(([v, l]) => `<option value="${v}" ${+f.dur === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+          <label class="f">Celdas en paralelo<input id="sPar" type="number" min="1" max="32" value="${esc(f.parallel)}"></label>
+          <label class="f">Etiqueta al importar<input id="sLabel" value="${esc(f.label)}" placeholder="p. ej. origen_erp"></label>
+          <label class="f">Rol<select id="sRole"><option value="origen">Origen</option><option value="destino" ${f.role === 'destino' ? 'selected' : ''}>Destino actual</option><option value="otro">Otro</option></select></label></div>
+          <div class="callout info small">Se copia <span class="mono">exacell_collect_&lt;versión&gt;.sh</span> al directorio del dbnode (verificado por SHA-256) y se ejecuta en segundo plano con <span class="mono">nohup</span>: sigue aunque cierre la aplicación. En las celdas solo se ejecuta <span class="mono">cellcli -e "LIST …"</span>.</div>
+          <div class="btn-row"><button class="btn ghost" id="sDry">Simulación (-n)</button><button class="btn" id="sGo">Iniciar recolección en el dbnode</button></div><div id="sGoOut" style="margin-top:10px"></div></div></div>
+      <div class="card section"><h2>3 · Recolecciones lanzadas desde la aplicación</h2><div id="sRuns"></div></div>
+      <div class="card section"><h2>4 · Traer una captura ya ejecutada</h2><p class="muted small">Si el cliente ya ejecutó el recolector, liste las capturas del directorio del dbnode y descárguelas sin copiar nada.</p>
+        <div class="btn-row"><button class="btn ghost" id="sList">Listar capturas del directorio</button></div><div id="sCaps" style="margin-top:10px"></div></div>`;
+    $('#sAuth').value = f.auth;
+    const vis = () => { $('#wKey').style.display = $('#sAuth').value === 'key' ? '' : 'none'; $('#wPwd').style.display = $('#sAuth').value === 'password' ? '' : 'none'; };
+    $('#sAuth').addEventListener('change', vis); vis();
+    const form = () => ({ host: $('#sHost').value.trim(), port: +$('#sPort').value || 22, user: $('#sUser').value.trim(), auth: $('#sAuth').value, key_path: $('#sKey').value.trim(), accept_new: $('#sNew').checked, dir: $('#sDir').value.trim(), group: $('#sGroup').value.trim(), cell_user: $('#sCellUser').value, tz: $('#sTz').value, dur: +$('#sDur').value, parallel: +$('#sPar').value || 4, label: $('#sLabel').value.trim(), role: $('#sRole').value });
+    const conn = () => { const x = form(); saveSshForm(x); return { host: x.host, port: x.port, user: x.user, auth: x.auth, key_path: x.key_path || null, accept_new: x.accept_new, password: x.auth === 'password' ? $('#sPwd').value : null }; };
+    const params = () => {
+      const x = form(); const st = $('#sStart').value;
+      const end = new Date(new Date(st + ':00Z').getTime() + x.dur * 3600e3).toISOString().slice(0, 19);
+      return { dir: x.dir, group: x.group, cell_user: x.cell_user, start: `${st}:00${x.tz}`, end: `${end}${x.tz}`, parallel: x.parallel, label: x.label, role: x.role };
+    };
+    const busy = async (btn, out, fn) => { btn.disabled = true; out.innerHTML = '<div class="muted small">Conectando con el dbnode…</div>'; try { await fn(); } catch (e) { out.innerHTML = `<div class="callout crit">${esc(e.message)}</div>`; } btn.disabled = false; };
+    $('#sTest').addEventListener('click', () => busy($('#sTest'), $('#sTestOut'), async () => {
+      const r = await post('/api/ssh/test', { conn: conn(), dir: form().dir, group: form().group });
+      $('#sTestOut').innerHTML = `<div class="callout ${r.ready ? 'ok' : 'warn'}"><b>${r.ready ? '✔ Listo para recoger' : '⚠ Revise los puntos marcados'}</b><ul>${r.checks.map((c) => `<li>${c.ok ? '✔' : '✖'} ${esc(c.check)} <span class="muted small">${esc(c.detail)}</span></li>`).join('')}</ul>${r.cells.length ? `<div class="small">Celdas del cell_group: <b>${r.cells.map(esc).join(', ')}</b></div>` : ''}</div>`;
+    }));
+    $('#sDry').addEventListener('click', () => busy($('#sDry'), $('#sGoOut'), async () => {
+      const r = await post('/api/ssh/dryrun', { conn: conn(), params: params() });
+      $('#sGoOut').innerHTML = `<pre class="code">${esc(r.output)}</pre>`;
+    }));
+    $('#sGo').addEventListener('click', () => {
+      const p = params();
+      if (!confirm(`Se copiará el recolector a ${p.dir} en ${form().host} y se ejecutará en segundo plano (${form().dur} h de histórico, usuario ${p.cell_user} en las celdas, solo lectura). ¿Continuar?`)) return;
+      busy($('#sGo'), $('#sGoOut'), async () => {
+        const r = await post('/api/ssh/start', { conn: conn(), params: p });
+        $('#sGoOut').innerHTML = `<div class="callout ok">Recolección iniciada en el dbnode (PID ${r.pid}). Siga su progreso abajo.</div>`;
+        drawRuns();
+      });
+    });
+    async function runAction(id, action) {
+      const out = $(`#run-${id} .rmsg`);
+      try {
+        if (action === 'cancel' && !confirm('¿Cancelar la recolección? La captura quedará INTERRUPTED (incompleta).')) return;
+        if (action === 'import') {
+          const r = await post(`/api/ssh/runs/${id}/import`, { password: $('#sPwd').value || null });
+          out.innerHTML = '<div class="log"></div>';
+          await followJob(r.job, out.querySelector('.log'), out);
+          return drawRuns();
+        }
+        out.innerHTML = '<span class="muted small">Consultando el dbnode…</span>';
+        await post(`/api/ssh/runs/${id}/${action}`, { password: $('#sPwd').value || null });
+        drawRuns();
+      } catch (e) { out.innerHTML = `<div class="callout crit small">${esc(e.message)}</div>`; }
+    }
+    async function drawRuns() {
+      const runs = await api('/api/ssh/runs');
+      if (!$('#sRuns')) return;
+      $('#sRuns').innerHTML = runs.length ? runs.map((r) => {
+        const st = r.status || {}; const running = st.state === 'running';
+        const cls = running ? 'info' : st.capture_status === 'COMPLETE' ? 'good' : 'critical';
+        const txt = running ? 'En curso' : (st.capture_status || 'terminada');
+        const pct = st.progress != null ? Math.round(st.progress * 100) : null;
+        return `<div id="run-${r.id}" style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--surface-1)">
+          <div class="btn-row" style="justify-content:space-between"><div><b>${esc(r.label || r.id)}</b> <span class="muted small">${esc(r.conn.user)}@${esc(r.conn.host)} · ${esc(r.params.start)} → ${esc(r.params.end)} · PID ${r.pid}</span></div><span class="chip ${cls}"><span class="dot"></span>${esc(txt)}${st.exit_code ? ' · código ' + esc(st.exit_code) : ''}</span></div>
+          ${pct != null ? `<div class="progress" style="margin:8px 0" title="${st.done_blocks}/${st.expected_blocks} bloques"><div style="width:${pct}%"></div></div><div class="muted tiny">${num(st.done_blocks, 0)} / ${num(st.expected_blocks, 0)} bloques (${pct} %) · consultado ${esc(st.checked_utc || '—')}</div>` : `<div class="muted tiny" style="margin-top:6px">Pulse «Actualizar» para consultar el progreso.</div>`}
+          <div class="btn-row" style="margin-top:8px"><button class="btn ghost small" data-a="status" data-id="${r.id}">Actualizar</button>${running ? `<button class="btn ghost small" data-a="cancel" data-id="${r.id}">Cancelar</button>` : ''}${!running && st.capture_dir && !r.imported_capture_id ? `<button class="btn small" data-a="import" data-id="${r.id}">Descargar e importar</button>` : ''}${r.imported_capture_id ? `<a class="btn ghost small" href="#/capturas/${r.imported_capture_id}">Ver captura importada →</a>` : ''}</div>
+          ${st.log_tail ? `<details class="box"><summary>Log del recolector (últimas líneas)</summary><pre class="code" style="margin-top:8px;max-height:260px">${esc(st.log_tail)}</pre></details>` : ''}<div class="rmsg" style="margin-top:8px"></div></div>`;
+      }).join('') : '<div class="empty">Todavía no se ha lanzado ninguna recolección desde la aplicación.</div>';
+      $$('#sRuns [data-a]').forEach((b) => b.addEventListener('click', () => runAction(b.dataset.id, b.dataset.a)));
+    }
+    $('#sList').addEventListener('click', () => busy($('#sList'), $('#sCaps'), async () => {
+      const caps = await post('/api/ssh/captures', { conn: conn(), dir: form().dir });
+      $('#sCaps').innerHTML = caps.length ? table(['Captura', 'Estado', 'Periodo', 'Celdas', 'Tamaño', ''], caps.map((c) => [`<span class="mono small">${esc(c.name)}</span>`, statusChip(c.capture_status), `<span class="small">${esc(c.period_start || '—')}<br>${esc(c.period_end || '')}</span>`, esc(c.cell_count || '—'), num(c.size_kb / 1024, 1) + ' MB', /EN_CURSO/.test(c.capture_status) ? '<span class="muted small">en curso</span>' : `<button class="btn small" data-fetch="${esc(c.name)}">Descargar e importar</button>`]), [3, 4]) + '<div id="sFetchOut" style="margin-top:10px"></div>' : '<div class="empty">No hay capturas exacell_capture_* en ese directorio.</div>';
+      $$('#sCaps [data-fetch]').forEach((b) => b.addEventListener('click', async () => {
+        const out = $('#sFetchOut'); b.disabled = true;
+        try {
+          const r = await post('/api/ssh/fetch', { conn: conn(), dir: form().dir, name: b.dataset.fetch, label: form().label || null, role: form().role });
+          out.innerHTML = '<div class="log"></div>';
+          await followJob(r.job, out.querySelector('.log'), out);
+        } catch (e) { out.innerHTML = `<div class="callout crit">${esc(e.message)}</div>`; b.disabled = false; }
+      }));
+    }));
+    await drawRuns();
+    clearInterval(state.sshTimer);
+    state.sshTimer = setInterval(async () => {
+      if (!$('#sRuns')) return clearInterval(state.sshTimer);
+      const runs = await api('/api/ssh/runs');
+      const running = runs.filter((r) => (r.status || {}).state === 'running');
+      if (!running.length || document.hidden) return;
+      for (const r of running) { try { await post(`/api/ssh/runs/${r.id}/status`, { password: $('#sPwd') ? $('#sPwd').value || null : null }); } catch { } }
+      drawRuns();
+    }, 20000);
   }
 
   // ------------------------------------------------------------------ Capturas
