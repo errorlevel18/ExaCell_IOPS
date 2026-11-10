@@ -25,6 +25,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from collections import Counter
 from typing import Dict, List, Optional, Tuple
 
 # (name, objectType, metricType, unit) — catálogo simulado, nombres reales de CellCLI.
@@ -384,3 +385,149 @@ class SimBackend:
                 return "\n".join(half) + "\n", "Connection to %s closed by remote host.\n" % cell, 255
             return ("\n".join(lines) + "\n") if lines else "", "", 0
         return "CELL-01504: Invalid command syntax.\n", "", 0
+
+
+# --------------------------------------------------------------------------- captura sintética
+
+DEFAULT_METRICS: List[Tuple[str, str]] = []  # se rellena desde el script recolector
+
+
+def _default_metrics() -> List[Tuple[str, str]]:
+    from .collector import script_text
+    txt = script_text().split("DEFAULT_METRICS='", 1)[1].split("'", 1)[0]
+    return [tuple(l.split()) for l in txt.splitlines() if l.strip()]
+
+
+def write_capture(cfg: SimConfig, outdir: str, start: str, end: str,
+                  metrics: Optional[List[Tuple[str, str]]] = None, user: str = "celladmin",
+                  dbnode: str = "simdbnode", name: Optional[str] = None) -> str:
+    """Genera una captura con el MISMO formato que exacell_collect.sh (sin bash ni ssh).
+
+    Aplica la inyección de fallos de ``cfg.failures`` igual que los falsos dcli/ssh.
+    Devuelve la ruta de la captura. Nunca sobrescribe una existente.
+    """
+    import hashlib
+    import os
+    from pathlib import Path
+
+    from .collector import script_version
+
+    be = SimBackend(cfg)
+    metrics = metrics or _default_metrics()
+    s_ep = int(parse_cellcli_time(start).timestamp())
+    e_ep = int(parse_cellcli_time(end).timestamp())
+    off = "+00:00" if start.endswith("Z") else start[-6:]
+    blocks = []
+    t = s_ep
+    while t < e_ep:
+        e = min(t + 3600, e_ep)
+        blocks.append((t, e, fmt_time(t, off), fmt_time(e, off)))
+        t = e
+    cap = Path(outdir) / (name or f"exacell_capture_{dbnode}_sim")
+    cap.mkdir(parents=True, exist_ok=False)
+    for sub in ("prevalidation", "cells", "data"):
+        (cap / sub).mkdir()
+    (cap / "cell_group.txt").write_text("\n".join(cfg.cells) + "\n")
+    (cap / "metrics_requested.txt").write_text("".join(f"{o} {n}\n" for o, n in metrics))
+    (cap / "blocks_plan.tsv").write_text("".join(f"{i}\t{b[2]}\t{b[3]}\n" for i, b in enumerate(blocks)))
+
+    pv_fail = {f.get("cell") for f in cfg.failures.get("prevalidate", [])}
+    pv_lines = ["cell\tcheck\tresult\tdetail"]
+    dcli_out = []
+    for c in cfg.cells:
+        if c in pv_fail:
+            pv_lines.append(f"{c}\tdcli_list_cell\tFAIL\tstatus=sin_respuesta")
+        else:
+            dcli_out.append(f"{c}: \t{c}\tonline")
+            pv_lines.append(f"{c}\tdcli_list_cell\tOK\tstatus=online")
+    (cap / "prevalidation" / "dcli_list_cell.out").write_text("\n".join(dcli_out) + ("\n" if dcli_out else ""))
+    (cap / "prevalidation" / "dcli_list_cell.err").write_text("")
+    (cap / "prevalidation" / "dcli_list_cell.rc").write_text("1\n" if pv_fail else "0\n")
+    expected = 0
+    selected = {}
+    for c in cfg.cells:
+        d = cap / "cells" / c
+        d.mkdir()
+        for key, cmd in (("list_cell", "LIST CELL ATTRIBUTES name, status"), ("cell_detail", "LIST CELL DETAIL"),
+                         ("celldisks", "LIST CELLDISK ATTRIBUTES name, diskType, size"),
+                         ("metricdefinition", "LIST METRICDEFINITION ATTRIBUTES name, objectType, metricType, unit")):
+            out, err, rc = be.run(c, cmd)
+            (d / f"{key}.out").write_text(out)
+            (d / f"{key}.err").write_text(err)
+            (d / f"{key}.rc").write_text(f"{rc}\n")
+            pv_lines.append(f"{c}\tssh_{key}\tOK\trc=0")
+        cat = {n: (o, mt, u) for n, o, mt, u in be.cells[c].catalog()}
+        sel, miss = [], []
+        for o, n in metrics:
+            if n not in cat:
+                miss.append(f"{o}\t{n}\tno_en_catalogo")
+            elif cat[n][0] != o:
+                miss.append(f"{o}\t{n}\tobjectType_distinto:{cat[n][0]}")
+            else:
+                sel.append((o, n, cat[n][1], cat[n][2]))
+        (d / "metrics_selected.tsv").write_text("".join("\t".join(s) + "\n" for s in sel))
+        (d / "metrics_missing.tsv").write_text("".join(m + "\n" for m in miss))
+        pv_lines.append(f"{c}\tmetric_selection\tOK\tseleccionadas={len(sel)} ausentes={len(miss)}")
+        selected[c] = sel
+        expected += len(sel) * len(blocks)
+    (cap / "prevalidation" / "prevalidation.tsv").write_text("\n".join(pv_lines) + "\n")
+
+    rows = []
+    status_all = "COMPLETE"
+    if pv_fail:
+        status_all = "PREVALIDATION_FAILED"
+    else:
+        for c in cfg.cells:
+            (cap / "data" / c).mkdir()
+            for i, (bs, be_, bs_s, be_s) in enumerate(blocks):
+                for o, n, mt, u in selected[c]:
+                    if be.failure_for(c, "network", n, bs):
+                        out, err, rc = "", f"ssh: connect to host {c} port 22: Connection timed out\n", 255
+                    else:
+                        cmd = (f"LIST METRICHISTORY WHERE name = '{n}' AND collectionTime NOT < '{bs_s}' AND "
+                               f"collectionTime < '{be_s}' ATTRIBUTES name, metricObjectName, collectionTime, metricValue")
+                        out, err, rc = be.run(c, cmd)
+                    of, ef = f"data/{c}/b{i:04d}_{n}.out", f"data/{c}/b{i:04d}_{n}.err"
+                    (cap / of).write_text(out)
+                    (cap / ef).write_text(err)
+                    if rc == 255:
+                        st = "INTERRUPTED" if out else "NETWORK_ERROR"
+                    elif re.search(r"(^|[^A-Za-z0-9])CELL-\d{5}", out + err):
+                        st = "CELLCLI_ERROR"
+                    elif rc != 0:
+                        st = "COMMAND_ERROR"
+                    elif not out.strip():
+                        st = "EMPTY"
+                    else:
+                        st = "OK"
+                    nlines = sum(1 for l in out.splitlines() if l.strip())
+                    rows.append([c, o, n, str(i), bs_s, be_s, st, str(rc), of, ef, str(nlines),
+                                 str(len(out.encode())), str(len(err.encode())),
+                                 "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z"])
+        if any(r[6] != "OK" for r in rows):
+            status_all = "INCOMPLETE"
+    hdr = ("cell\tobject_type\tmetric\tblock_index\tblock_start\tblock_end\tstatus\trc\tout_file\terr_file\t"
+           "out_lines\tout_bytes\terr_bytes\tstarted_utc\tended_utc")
+    (cap / "blocks.tsv").write_text(hdr + "\n" + "".join("\t".join(r) + "\n" for r in rows))
+    counts = Counter(r[6] for r in rows)
+    exit_code = {"COMPLETE": 0, "INCOMPLETE": 3, "PREVALIDATION_FAILED": 2}[status_all]
+    man = {
+        "format_version": "1", "collector_version": script_version() + "-sim", "metrics_mode": "global",
+        "dbnode_host": dbnode, "remote_user": user, "cell_group_file": "cell_group", "cell_count": len(cfg.cells),
+        "cells": " ".join(cfg.cells), "period_start": start, "period_end": end, "period_start_epoch": s_ep,
+        "period_end_epoch": e_ep, "block_seconds": 3600, "block_count": len(blocks),
+        "time_filter": "collectionTime NOT < 'start' AND collectionTime < 'end'",
+        "created_utc": "2026-01-01T00:00:00Z", "finished_utc": "2026-01-01T00:00:00Z",
+        "prevalidation_status": "FAILED" if pv_fail else "OK", "expected_blocks": expected if not pv_fail else expected,
+        "recorded_blocks": len(rows), "not_run_blocks": (expected - len(rows)),
+        "status_counts": " ".join(f"{k}:{v}" for k, v in counts.items()),
+        "capture_status": status_all, "exit_code": exit_code,
+    }
+    (cap / "manifest.txt").write_text("".join(f"{k}={v}\n" for k, v in man.items()))
+    (cap / "summary.txt").write_text(f"Captura simulada {cap}\nEstado: {status_all}\n")
+    sums = []
+    for f in sorted(p for p in cap.rglob("*") if p.is_file() and p.name != "SHA256SUMS"):
+        rel = "./" + str(f.relative_to(cap)).replace(os.sep, "/")
+        sums.append(f"{hashlib.sha256(f.read_bytes()).hexdigest()}  {rel}")
+    (cap / "SHA256SUMS").write_text("\n".join(sums) + "\n")
+    return str(cap)
