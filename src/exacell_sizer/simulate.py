@@ -248,7 +248,7 @@ class SimCell:
         if metric.startswith("N_HCA_MB_"):
             tot = sum(self.rate("CD_IO_BY_R_SM_SEC", d, minute) + self.rate("CD_IO_BY_R_LG_SEC", d, minute)
                       for d, _ in self.disks)
-            return tot * (1.05 if metric.endswith("TRANS_SEC") else 0.4)
+            return tot * (0.25 if metric.endswith("TRANS_SEC") else 0.10)  # Smart Scan filtra en la celda
         if metric in BASE_RATES["CELL"]:
             b = BASE_RATES["CELL"][metric]
             v = b if metric in NOT_SCALED else b * self._shape(minute)
