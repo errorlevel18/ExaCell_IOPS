@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ExaCell Sizer</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232a78d6'/%3E%3Crect x='7' y='8' width='18' height='4' rx='1.5' fill='white'/%3E%3Crect x='7' y='14' width='18' height='4' rx='1.5' fill='white' opacity='.8'/%3E%3Crect x='7' y='20' width='18' height='4' rx='1.5' fill='white' opacity='.6'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--series-1)"/><rect x="7" y="8" width="18" height="4" rx="1.5" fill="#fff"/><rect x="7" y="14" width="18" height="4" rx="1.5" fill="#fff" opacity=".8"/><rect x="7" y="20" width="18" height="4" rx="1.5" fill="#fff" opacity=".6"/></svg>
+      <div><div class="brand-name">ExaCell Sizer</div><div class="brand-sub">Dimensionamiento de celdas</div></div>
+      <button class="menu-toggle" id="menuToggle" aria-label="Menú">☰</button>
+    </div>
+    <nav id="nav">
+      <a href="#/" data-route="dashboard"><span class="ni">◧</span>Panel</a>
+      <a href="#/recolector" data-route="collector"><span class="ni">⌘</span>Recolector</a>
+      <a href="#/capturas" data-route="captures"><span class="ni">⇪</span>Capturas</a>
+      <a href="#/dimensionamiento" data-route="sizing"><span class="ni">▦</span>Dimensionamiento</a>
+      <a href="#/catalogo" data-route="catalog"><span class="ni">☰</span>Catálogo Exadata</a>
+      <a href="#/guia" data-route="guide"><span class="ni">?</span>Guía</a>
+    </nav>
+    <div class="sidebar-foot">
+      <button class="btn ghost small" id="themeToggle" type="button">Tema: automático</button>
+      <div class="muted tiny" id="versionInfo"></div>
+    </div>
+  </aside>
+  <main class="content" id="view" tabindex="-1">
+    <div class="loading">Cargando…</div>
+  </main>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+<script src="/static/charts.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

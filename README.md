@@ -15,7 +15,32 @@ comprensible, trazable y prudente:
 > Las cifras de datasheet son máximos comerciales. La herramienta nunca afirma que una
 > configuración funcionará solo porque el cálculo sea favorable.
 
-## Flujo de trabajo
+## Arrancar la aplicación web
+
+```bash
+pip install -e .
+```
+```bash
+python -m exacell_sizer web
+```
+
+Se abre el navegador en `http://localhost:8765/` (solo accesible desde este PC; funciona sin
+Internet). Los datos se guardan en la carpeta `exacell_workspace` (cámbiela con `--workspace`).
+Opciones: `--port`, `--host`, `--no-browser`.
+
+| Sección | Qué permite |
+|---|---|
+| **Panel** | Estado general, pasos guiados, últimas capturas y dictámenes |
+| **Recolector** | Generar el comando para el dbnode (fechas, zona, usuario), ver y descargar el script |
+| **Capturas** | Subir el `.tar.gz`/`.zip` del cliente (arrastrar y soltar) o generar una captura **simulada** de demostración; ver carga por medida y por celda, mapa de cobertura e incidencias con procedencia |
+| **Dimensionamiento** | Elegir origen y destino actual, crecimiento, reserva, N-1, latencia objetivo, aproximaciones y candidatos; ver dictamen, utilización por recurso, demanda frente a referencia y descargar los informes |
+| **Catálogo Exadata** | Cifras por modelo y tipo de celda con evidencia, fuente y página |
+| **Guía** | Interpretación de informes, metodología, limitaciones y recolector |
+
+Para probar sin datos reales: **Capturas → Captura simulada de demostración** (origen y otra con
+rol «Destino actual»), y después **Dimensionamiento → Cargar ejemplo → Ejecutar**.
+
+## Flujo de trabajo (línea de comandos)
 
 ```
  dbnode del ORIGEN (cliente)                  PC del analista

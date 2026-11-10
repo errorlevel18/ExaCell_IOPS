@@ -171,7 +171,20 @@ def cmd_catalog(a) -> int:
     return 1
 
 
+def cmd_web(a) -> int:
+    from .web.server import serve
+    serve(a.workspace, a.host, a.port, not a.no_browser)
+    return 0
+
+
 def register(sub) -> None:
+    s = sub.add_parser("web", help="Abrir la aplicación web local (subida de capturas, paneles, dimensionamiento)")
+    s.add_argument("--workspace", default="exacell_workspace", help="Carpeta de trabajo (se crea si no existe)")
+    s.add_argument("--host", default="127.0.0.1", help="Interfaz de escucha (por defecto solo este PC)")
+    s.add_argument("--port", type=int, default=8765)
+    s.add_argument("--no-browser", action="store_true", help="No abrir el navegador automáticamente")
+    s.set_defaults(func=cmd_web)
+
     s = sub.add_parser("simulate", help="Generar una captura SIMULADA (formato del recolector)")
     s.add_argument("--out", required=True)
     s.add_argument("--start", required=True, help="ISO-8601 con zona, p. ej. 2026-11-03T00:00:00+01:00")

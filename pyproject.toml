@@ -19,7 +19,7 @@ exacell-sizer = "exacell_sizer.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-exacell_sizer = ["resources/*.sh", "catalog/*.json"]
+exacell_sizer = ["resources/*.sh", "resources/*.md", "catalog/*.json", "web/static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
