@@ -1,0 +1,270 @@
+{
+  "catalog_version": "1.0.0",
+  "catalog_date": "2026-11-10",
+  "notes": [
+    "Solo contiene cifras PUBLICADAS en los datasheets indicados, con página. Las cifras por celda derivadas (p. ej. HDD a partir de tablas de rack) se calculan al cargar el catálogo con la fórmula registrada en 'derivations' y quedan marcadas como 'derivado'.",
+    "Todas las cifras son máximos comerciales ('Maximum SQL ...'); Oracle indica que 'Actual system performance varies by application'. No representan capacidad garantizada ni capacidad segura bajo una latencia objetivo.",
+    "Las cifras de rack pueden estar limitadas por los servidores de base de datos y no por las celdas (p. ej. X9M Full Rack 22,400,000 = 8 x 2,800,000 del servidor de BD). No se dividen entre el número de celdas salvo en las derivaciones declaradas."
+  ],
+  "unit_conversion": {
+    "datasheet_GB_bytes": 1000000000,
+    "cellcli_MB_bytes": 1048576,
+    "basis": "Datasheets: '1 GB = 1 billion bytes' (nota de capacidad raw; se asume igual para ancho de banda). CellCLI MB se asume 2^20 bytes. Conversión conservadora: 1 GB/s = 953.674 MB/s de CellCLI."
+  },
+  "sources": {
+    "x6-2": {"file": "exadata-x6-2-ds.pdf", "title": "Data Sheet: Exadata X6-2", "edition": "PDF creado 2017-07-21 (Copyright 2017)", "pages": 24, "sha256": "090ef0fd11069519d65703027d006dff2bba98d583728ae9878cc1c75f027d6b"},
+    "x7-2": {"file": "exadata-x7-2-ds.pdf", "title": "Oracle Exadata Database Machine X7-2", "edition": "PDF modificado 2019-03-05 (Copyright 2017)", "pages": 24, "sha256": "82ea84ba9adc51ccb2b22b1bceb17d0b6d97c2ece21909dd3d734fcbb72ceb5b"},
+    "x8m-2": {"file": "exadata-x8m-2-ds.pdf", "title": "Exadata Database Machine X8M-2", "edition": "PDF modificado 2020-01-30 (Copyright 2020)", "pages": 24, "sha256": "67ce4a438dc4ad0115ed747ce29e32c256d788ba1c9d328e42b63847d6394f05"},
+    "x9m-2": {"file": "exadata-x9m-2-ds.pdf", "title": "Oracle Exadata Database Machine X9M-2 Data Sheet", "edition": "PDF modificado 2023-07-05 (Copyright 2021)", "pages": 29, "sha256": "4faa4d49d5079ba57b5e6b2cc213952ee166fa61914e3e90bb29bab91d503c49"},
+    "x10m": {"file": "exadata-x10m-ds.pdf", "title": "Oracle Exadata Database Machine X10M", "edition": "Version 1.2 (Copyright 2024, PDF 2024-10-29)", "pages": 28, "sha256": "f4ec6c72f7ff317b7ddff8100c914b1f0390bc866380a523a3a60be567bd00cc"},
+    "x11m": {"file": "exadata-x11m-ds.pdf", "title": "Oracle Exadata Database Machine X11M", "edition": "Version 1.1 (Copyright 2025, PDF 2025-02-05)", "pages": 30, "sha256": "852aa528cb8d5cea477e6884d5ecd3d2bb42763650695be8a7f53b1a4fe92432"}
+  },
+  "metric_kinds": {
+    "sql_flash_scan_bandwidth": {"unit": "GB/s", "label": "Maximum SQL Flash Bandwidth", "conditions": "Peak physical scan bandwidth achieved running SQL, assuming no database compression (lectura de escaneo).", "direction": "read", "layer": "flash", "io": "scan"},
+    "sql_rdma_memory_bandwidth": {"unit": "GB/s", "label": "Maximum SQL Exadata RDMA Memory Bandwidth", "conditions": "Peak scan bandwidth desde Exadata RDMA Memory; NO es ancho de banda flash.", "direction": "read", "layer": "xrmem", "io": "scan"},
+    "sql_flash_and_rdma_bandwidth": {"unit": "GB/s", "label": "Maximum SQL Flash and Exadata RDMA Memory Bandwidth (rack)", "conditions": "Columna de rack X11M que combina flash y RDMA Memory; no comparable con escaneo flash.", "direction": "read", "layer": "flash+xrmem", "io": "scan"},
+    "sql_read_iops_8k": {"unit": "IOPS", "label": "Maximum SQL Read IOPS", "conditions": "Based on 8K I/O requests running SQL. El nivel que sirve las lecturas (flash, PMEM o XRMEM) depende del modelo: ver 'read_iops_tier'.", "direction": "read", "layer": "model_tier", "io": "8k"},
+    "sql_flash_write_iops_8k": {"unit": "IOPS", "label": "Maximum SQL Write IOPS / Flash Write IOPS", "conditions": "Based on 8K I/O requests running SQL. Flash write I/Os measured at the storage servers after ASM mirroring.", "direction": "write", "layer": "flash", "io": "8k"},
+    "sql_disk_bandwidth": {"unit": "GB/s", "label": "Maximum SQL Disk Bandwidth (rack)", "conditions": "Peak physical scan bandwidth achieved running SQL, assuming no database compression. Publicado solo por rack.", "direction": "read", "layer": "hdd", "io": "scan"},
+    "sql_disk_iops": {"unit": "IOPS", "label": "Maximum SQL Disk IOPS (rack)", "conditions": "Based on 8K IO requests running SQL. Publicado solo por rack; la mezcla lectura/escritura no se especifica.", "direction": "unspecified", "layer": "hdd", "io": "8k"},
+    "db_sql_read_iops_8k": {"unit": "IOPS", "label": "Database Server Maximum SQL Read IOPS", "conditions": "Based on 8K I/O requests running SQL (servidor de base de datos).", "direction": "read", "layer": "db_server", "io": "8k"},
+    "db_sql_write_iops_8k": {"unit": "IOPS", "label": "Database Server Maximum SQL Write IOPS", "conditions": "Based on 8K I/O requests running SQL (servidor de base de datos).", "direction": "write", "layer": "db_server", "io": "8k"}
+  },
+  "approximations": [
+    {"id": "X8-2_as_X8M-2", "requested": "X8-2", "use_model": "X8M-2", "warning": "No hay datasheet X8-2 en el catálogo. X8M-2 añade PMEM y red RoCE 100 Gb; sus lecturas 8K (PMEM) y su red sobreestiman un X8-2. Solo como aproximación autorizada."},
+    {"id": "X9M-8_as_X9M-2", "requested": "X9M-8", "use_model": "X9M-2", "warning": "Las celdas de X9M-8 son las de X9M-2, pero los servidores de BD difieren; los límites de servidor de BD/rack no aplican."},
+    {"id": "X8M-8_as_X8M-2", "requested": "X8M-8", "use_model": "X8M-2", "warning": "Las celdas de X8M-8 son las de X8M-2, pero los servidores de BD difieren; los límites de servidor de BD/rack no aplican."}
+  ],
+  "metric_approximations": {
+    "read_iops_memory_tier_as_flash": "Usar la cifra 'Maximum SQL Read IOPS' de X8M/X9M (PMEM) o X10M/X11M (XRMEM) como referencia de lecturas pequeñas observadas en flash. La cifra publicada se alcanza leyendo de memoria persistente/RDMA, no de flash: puede sobreestimar la capacidad de lectura flash.",
+    "hdd_iops_from_rack": "Usar la cifra de IOPS HDD derivada (rack / nº de celdas) como capacidad por celda: supone escalado lineal y reparto uniforme; la mezcla lectura/escritura no está publicada.",
+    "small_io_as_8k": "Comparar las peticiones 'pequeñas' de CellCLI (<=128 KB) con la cifra publicada para E/S de 8 KB. Si el tamaño medio real es mayor que 8 KB la capacidad real en IOPS es menor."
+  },
+  "models": [
+    {
+      "model": "X6-2", "generation": "X6", "source": "x6-2",
+      "read_iops_tier": "flash", "read_iops_tier_basis": "Tabla de rack 'Maximum SQL Flash Read IOPS' (p.18)",
+      "limits": {"max_storage_servers_per_rack": 18, "max_db_servers_per_rack": 19, "max_servers_per_rack": 22, "min_storage_servers": 3, "page": 17},
+      "network": {"fabric": "InfiniBand QDR", "ports_per_server": 2, "gbps_per_port": 40, "page": 17},
+      "latency_claims": [],
+      "servers": [
+        {"id": "DB", "role": "db", "label": "Database Server", "page": 18, "figures": {"db_sql_read_iops_8k": 562500, "db_sql_write_iops_8k": 518000}},
+        {"id": "HC", "role": "storage", "label": "Storage Server HC", "page": 18, "has_hdd": true, "has_flash": true,
+         "hardware": {"cores": 20, "hdd": "12x 8 TB 7,200 RPM", "flash": "4x 3.2 TB NVMe PCIe 3.0 flash cards", "page": 17},
+         "figures": {"sql_flash_scan_bandwidth": 21, "sql_read_iops_8k": 475000, "sql_flash_write_iops_8k": 410000},
+         "derivations": {"hdd": {"racks": ["Full Rack", "Half Rack", "Quarter Rack"], "method": "min_per_storage_server"}}},
+        {"id": "EF", "role": "storage", "label": "Storage Server EF", "page": 18, "has_hdd": false, "has_flash": true,
+         "hardware": {"cores": 20, "hdd": "None", "flash": "8x 3.2 TB NVMe PCIe 3.0 flash drives", "page": 17},
+         "figures": {"sql_flash_scan_bandwidth": 25, "sql_read_iops_8k": 495000, "sql_flash_write_iops_8k": 450000}},
+        {"id": "HC-EIGHTH", "role": "storage", "label": "Eighth Rack Storage Server HC (mitad de núcleos, discos y flash)", "page": 17, "has_hdd": true, "has_flash": true, "eighth_only": true,
+         "hardware": {"cores": 10, "hdd": "6x 8 TB (mitad retirada)", "flash": "2x 3.2 TB (mitad retirada)", "page": 17},
+         "figures": {},
+         "derivations": {"hdd": {"racks": ["Eighth Rack"], "method": "min_per_storage_server"},
+                         "flash": {"racks": ["Eighth Rack"], "metrics": ["sql_flash_scan_bandwidth"], "method": "min_per_storage_server",
+                                   "note": "X6-2 no publica cifras por servidor Eighth Rack. Las IOPS del Eighth Rack (562,500) coinciden con un servidor de BD y pueden estar limitadas por BD: no se derivan IOPS por celda."}}}
+      ],
+      "racks": [
+        {"name": "Eighth Rack", "db_servers": 2, "storage_servers": 3, "storage_ids": ["HC-EIGHTH", "EF"], "page_config": 17, "page_perf": 18,
+         "flash": {"HC-EIGHTH": {"sql_flash_scan_bandwidth": 32, "sql_read_iops_8k": 562500, "sql_flash_write_iops_8k": 518000}, "EF": {"sql_flash_scan_bandwidth": 38, "sql_read_iops_8k": 562500, "sql_flash_write_iops_8k": 518000}},
+         "disk": {"sql_disk_bandwidth": 2.7, "sql_disk_iops": 3900}},
+        {"name": "Quarter Rack", "db_servers": 2, "storage_servers": 3, "storage_ids": ["HC", "EF"], "page_config": 17, "page_perf": 18,
+         "flash": {"HC": {"sql_flash_scan_bandwidth": 64, "sql_read_iops_8k": 1125000, "sql_flash_write_iops_8k": 1036000}, "EF": {"sql_flash_scan_bandwidth": 75, "sql_read_iops_8k": 1125000, "sql_flash_write_iops_8k": 1036000}},
+         "disk": {"sql_disk_bandwidth": 5.4, "sql_disk_iops": 7800}},
+        {"name": "Half Rack", "db_servers": 4, "storage_servers": 7, "storage_ids": ["HC", "EF"], "page_config": 17, "page_perf": 18,
+         "flash": {"HC": {"sql_flash_scan_bandwidth": 150, "sql_read_iops_8k": 2250000, "sql_flash_write_iops_8k": 2072000}, "EF": {"sql_flash_scan_bandwidth": 175, "sql_read_iops_8k": 2250000, "sql_flash_write_iops_8k": 2072000}},
+         "disk": {"sql_disk_bandwidth": 12.5, "sql_disk_iops": 18000}},
+        {"name": "Full Rack", "db_servers": 8, "storage_servers": 14, "storage_ids": ["HC", "EF"], "page_config": 17, "page_perf": 18,
+         "flash": {"HC": {"sql_flash_scan_bandwidth": 301, "sql_read_iops_8k": 4500000, "sql_flash_write_iops_8k": 4144000}, "EF": {"sql_flash_scan_bandwidth": 350, "sql_read_iops_8k": 4500000, "sql_flash_write_iops_8k": 4144000}},
+         "disk": {"sql_disk_bandwidth": 25, "sql_disk_iops": 36000}}
+      ]
+    },
+    {
+      "model": "X7-2", "generation": "X7", "source": "x7-2",
+      "read_iops_tier": "flash", "read_iops_tier_basis": "Tabla de rack 'Maximum SQL Flash Read IOPS' (p.19)",
+      "limits": {"max_storage_servers_per_rack": 18, "max_db_servers_per_rack": 19, "max_servers_per_rack": 22, "min_storage_servers": 3, "page": 18},
+      "network": {"fabric": "InfiniBand QDR", "ports_per_server": 2, "gbps_per_port": 40, "page": 18},
+      "latency_claims": [],
+      "servers": [
+        {"id": "DB", "role": "db", "label": "Database Server", "page": 19, "figures": {"db_sql_read_iops_8k": 597500, "db_sql_write_iops_8k": 544000}},
+        {"id": "HC", "role": "storage", "label": "Storage Server HC", "page": 19, "has_hdd": true, "has_flash": true,
+         "hardware": {"cores": 20, "hdd": "12x 10 TB 7,200 RPM", "flash": "4x 6.4 TB NVMe PCIe 3.0 Flash cards", "page": 18},
+         "figures": {"sql_flash_scan_bandwidth": 25, "sql_read_iops_8k": 475000, "sql_flash_write_iops_8k": 420000},
+         "derivations": {"hdd": {"racks": ["Full Rack", "Half Rack", "Quarter Rack"], "method": "min_per_storage_server"}}},
+        {"id": "HC-EIGHTH", "role": "storage", "label": "Eighth Rack Storage Server HC", "page": 19, "has_hdd": true, "has_flash": true, "eighth_only": true,
+         "hardware": {"cores": 10, "hdd": "6x 10 TB 7,200 RPM", "flash": "2x 6.4 TB NVMe PCIe 3.0 Flash cards", "page": 18},
+         "figures": {"sql_flash_scan_bandwidth": 12.5, "sql_read_iops_8k": 237500, "sql_flash_write_iops_8k": 210000},
+         "derivations": {"hdd": {"racks": ["Eighth Rack"], "method": "min_per_storage_server"}}},
+        {"id": "EF", "role": "storage", "label": "Storage Server EF", "page": 19, "has_hdd": false, "has_flash": true,
+         "hardware": {"cores": 20, "hdd": "None", "flash": "8x 6.4 TB NVMe PCIe 3.0 Flash cards", "page": 18},
+         "figures": {"sql_flash_scan_bandwidth": 25, "sql_read_iops_8k": 498000, "sql_flash_write_iops_8k": 450000}}
+      ],
+      "racks": [
+        {"name": "Eighth Rack", "db_servers": 2, "storage_servers": 3, "storage_ids": ["HC-EIGHTH", "EF"], "page_config": 18, "page_perf": 19,
+         "flash": {"HC-EIGHTH": {"sql_flash_scan_bandwidth": 38, "sql_read_iops_8k": 597000, "sql_flash_write_iops_8k": 544000}, "EF": {"sql_flash_scan_bandwidth": 38, "sql_read_iops_8k": 597000, "sql_flash_write_iops_8k": 544000}},
+         "disk": {"sql_disk_bandwidth": 2.7, "sql_disk_iops": 3900}},
+        {"name": "Quarter Rack", "db_servers": 2, "storage_servers": 3, "storage_ids": ["HC", "EF"], "page_config": 18, "page_perf": 19,
+         "flash": {"HC": {"sql_flash_scan_bandwidth": 75, "sql_read_iops_8k": 1194000, "sql_flash_write_iops_8k": 1088000}, "EF": {"sql_flash_scan_bandwidth": 75, "sql_read_iops_8k": 1194000, "sql_flash_write_iops_8k": 1088000}},
+         "disk": {"sql_disk_bandwidth": 5.4, "sql_disk_iops": 7800}},
+        {"name": "Half Rack", "db_servers": 4, "storage_servers": 7, "storage_ids": ["HC", "EF"], "page_config": 18, "page_perf": 19,
+         "flash": {"HC": {"sql_flash_scan_bandwidth": 175, "sql_read_iops_8k": 2388000, "sql_flash_write_iops_8k": 2176000}, "EF": {"sql_flash_scan_bandwidth": 175, "sql_read_iops_8k": 2388000, "sql_flash_write_iops_8k": 2176000}},
+         "disk": {"sql_disk_bandwidth": 12.5, "sql_disk_iops": 18000}},
+        {"name": "Full Rack", "db_servers": 8, "storage_servers": 14, "storage_ids": ["HC", "EF"], "page_config": 18, "page_perf": 19,
+         "flash": {"HC": {"sql_flash_scan_bandwidth": 350, "sql_read_iops_8k": 4776000, "sql_flash_write_iops_8k": 4352000}, "EF": {"sql_flash_scan_bandwidth": 350, "sql_read_iops_8k": 4776000, "sql_flash_write_iops_8k": 4352000}},
+         "disk": {"sql_disk_bandwidth": 25, "sql_disk_iops": 36000}}
+      ]
+    },
+    {
+      "model": "X8M-2", "generation": "X8M", "source": "x8m-2",
+      "read_iops_tier": "pmem", "read_iops_tier_basis": "Tabla de rack 'Maximum SQL PMEM Read IOPS' (p.19)",
+      "limits": {"max_storage_servers_per_rack": 18, "max_db_servers_per_rack": 19, "max_servers_per_rack": 22, "min_storage_servers": 3, "page": 18},
+      "network": {"fabric": "RoCE", "ports_per_server": 2, "gbps_per_port": 100, "page": 17},
+      "latency_claims": [{"text": "from 200µs to less than 19µs", "page": 2, "us": 19, "condition": "lecturas OLTP desde PMEM (marketing, 'less than')"}],
+      "servers": [
+        {"id": "DB", "role": "db", "label": "Database Server", "page": 18, "figures": {"db_sql_read_iops_8k": 1500000, "db_sql_write_iops_8k": 980000}},
+        {"id": "HC", "role": "storage", "label": "Storage Server HC", "page": 18, "has_hdd": true, "has_flash": true,
+         "hardware": {"cores": 32, "hdd": "12x 14 TB 7,200 RPM", "flash": "4x 6.4 TB NVMe PCIe3.0 Flash cards", "memory_tier": "1.5 TB Persistent Memory", "page": 17},
+         "figures": {"sql_flash_scan_bandwidth": 25, "sql_read_iops_8k": 1500000, "sql_flash_write_iops_8k": 470000},
+         "derivations": {"hdd": {"racks": ["Full Rack", "Half Rack", "Quarter Rack"], "method": "min_per_storage_server"}}},
+        {"id": "EF", "role": "storage", "label": "Storage Server EF", "page": 18, "has_hdd": false, "has_flash": true,
+         "hardware": {"cores": 32, "hdd": "None", "flash": "8x 6.4 TB NVMe PCIe3.0 Flash cards", "memory_tier": "1.5 TB Persistent Memory", "page": 17},
+         "figures": {"sql_flash_scan_bandwidth": 40, "sql_read_iops_8k": 1500000, "sql_flash_write_iops_8k": 470000}},
+        {"id": "XT", "role": "storage", "label": "Storage Server XT", "page": 18, "has_hdd": true, "has_flash": false,
+         "hardware": {"cores": 16, "hdd": "12x 14 TB 7,200 RPM", "flash": "None", "page": 17},
+         "figures": {}, "unpublished_note": "El datasheet indica n/a para todas las cifras de rendimiento de XT."},
+        {"id": "HC-EIGHTH", "role": "storage", "label": "Eighth Rack Storage Server HC", "page": 18, "has_hdd": true, "has_flash": true, "eighth_only": true,
+         "hardware": {"cores": 16, "hdd": "6x 14 TB 7,200 RPM", "flash": "2x 6.4 TB NVMe PCIe3.0 Flash cards", "memory_tier": "1.5 TB Persistent Memory", "page": 17},
+         "figures": {"sql_flash_scan_bandwidth": 13, "sql_read_iops_8k": 750000, "sql_flash_write_iops_8k": 235000},
+         "derivations": {"hdd": {"racks": ["Eighth Rack"], "method": "min_per_storage_server"}}}
+      ],
+      "racks": [
+        {"name": "Eighth Rack", "db_servers": 2, "storage_servers": 3, "storage_ids": ["HC-EIGHTH", "EF"], "page_config": 17, "page_perf": 19,
+         "flash": {"HC-EIGHTH": {"sql_flash_scan_bandwidth": 37.5, "sql_read_iops_8k": 1500000, "sql_flash_write_iops_8k": 705000}, "EF": {"sql_flash_scan_bandwidth": 60, "sql_read_iops_8k": 1500000, "sql_flash_write_iops_8k": 705000}},
+         "disk": {"sql_disk_bandwidth": 2.7, "sql_disk_iops": 3900}},
+        {"name": "Quarter Rack", "db_servers": 2, "storage_servers": 3, "storage_ids": ["HC", "EF"], "page_config": 17, "page_perf": 19,
+         "flash": {"HC": {"sql_flash_scan_bandwidth": 75, "sql_read_iops_8k": 3000000, "sql_flash_write_iops_8k": 1410000}, "EF": {"sql_flash_scan_bandwidth": 120, "sql_read_iops_8k": 3000000, "sql_flash_write_iops_8k": 1410000}},
+         "disk": {"sql_disk_bandwidth": 5.4, "sql_disk_iops": 7800}},
+        {"name": "Half Rack", "db_servers": 4, "storage_servers": 7, "storage_ids": ["HC", "EF"], "page_config": 17, "page_perf": 19,
+         "flash": {"HC": {"sql_flash_scan_bandwidth": 175, "sql_read_iops_8k": 6000000, "sql_flash_write_iops_8k": 3290000}, "EF": {"sql_flash_scan_bandwidth": 280, "sql_read_iops_8k": 6000000, "sql_flash_write_iops_8k": 3290000}},
+         "disk": {"sql_disk_bandwidth": 12.5, "sql_disk_iops": 18000}},
+        {"name": "Full Rack", "db_servers": 8, "storage_servers": 14, "storage_ids": ["HC", "EF"], "page_config": 17, "page_perf": 19,
+         "flash": {"HC": {"sql_flash_scan_bandwidth": 350, "sql_read_iops_8k": 12000000, "sql_flash_write_iops_8k": 6580000}, "EF": {"sql_flash_scan_bandwidth": 560, "sql_read_iops_8k": 12000000, "sql_flash_write_iops_8k": 6580000}},
+         "disk": {"sql_disk_bandwidth": 25, "sql_disk_iops": 36000}}
+      ]
+    },
+    {
+      "model": "X9M-2", "generation": "X9M", "source": "x9m-2",
+      "read_iops_tier": "pmem", "read_iops_tier_basis": "Tabla de rack 'Maximum SQL PMEM Read IOPS' (p.22)",
+      "limits": {"max_storage_servers_per_rack": 18, "max_db_servers_per_rack": 19, "max_servers_per_rack": 22, "min_storage_servers": 3, "page": 21},
+      "network": {"fabric": "RoCE", "ports_per_server": 2, "gbps_per_port": 100, "page": 20},
+      "latency_claims": [{"text": "from 200µs to less than 19µs", "page": 4, "us": 19, "condition": "lecturas OLTP desde PMEM (marketing, 'less than')"}],
+      "servers": [
+        {"id": "DB", "role": "db", "label": "Database Server", "page": 22, "figures": {"db_sql_read_iops_8k": 2800000, "db_sql_write_iops_8k": 2000000}},
+        {"id": "HC", "role": "storage", "label": "Storage Server High Capacity (HC)", "page": 22, "has_hdd": true, "has_flash": true,
+         "hardware": {"cores": 32, "hdd": "12x 18 TB 7,200 RPM", "flash": "4x 6.4 TB NVMe PCIe4.0 Flash cards", "memory_tier": "1.5 TB Persistent Memory", "page": 20},
+         "figures": {"sql_flash_scan_bandwidth": 45, "sql_read_iops_8k": 2300000, "sql_flash_write_iops_8k": 614000},
+         "derivations": {"hdd": {"racks": ["Full Rack", "Half Rack", "Quarter Rack"], "method": "min_per_storage_server"}}},
+        {"id": "EF", "role": "storage", "label": "Storage Server Extreme Flash (EF)", "page": 22, "has_hdd": false, "has_flash": true,
+         "hardware": {"cores": 32, "hdd": "None", "flash": "8x 6.4 TB NVMe PCIe4.0 Flash cards", "memory_tier": "1.5 TB Persistent Memory", "page": 20},
+         "figures": {"sql_flash_scan_bandwidth": 75, "sql_read_iops_8k": 2300000, "sql_flash_write_iops_8k": 614000}},
+        {"id": "XT", "role": "storage", "label": "Storage Server Extended (XT)", "page": 22, "has_hdd": true, "has_flash": false,
+         "hardware": {"cores": 16, "hdd": "12x 18 TB 7,200 RPM", "flash": "None", "page": 20},
+         "figures": {}, "unpublished_note": "El datasheet indica n/a para todas las cifras de rendimiento de XT."},
+        {"id": "HC-EIGHTH", "role": "storage", "label": "Storage Server Eighth Rack High Capacity (HC)", "page": 22, "has_hdd": true, "has_flash": true, "eighth_only": true,
+         "hardware": {"cores": 16, "hdd": "6x 18 TB 7,200 RPM", "flash": "2x 6.4 TB NVMe PCIe4.0 Flash cards", "memory_tier": "768 GB Persistent Memory", "page": 20},
+         "figures": {"sql_flash_scan_bandwidth": 23, "sql_read_iops_8k": 1150000, "sql_flash_write_iops_8k": 307000},
+         "derivations": {"hdd": {"racks": ["Eighth Rack"], "method": "min_per_storage_server"}}}
+      ],
+      "racks": [
+        {"name": "Eighth Rack", "db_servers": 2, "storage_servers": 3, "storage_ids": ["HC-EIGHTH"], "page_config": 21, "page_perf": 22, "page_disk": 23,
+         "flash": {"HC-EIGHTH": {"sql_flash_scan_bandwidth": 67.5, "sql_read_iops_8k": 2800000, "sql_flash_write_iops_8k": 921000}},
+         "disk": {"sql_disk_bandwidth": 2.7, "sql_disk_iops": 3900}},
+        {"name": "Quarter Rack", "db_servers": 2, "storage_servers": 3, "storage_ids": ["HC", "EF"], "page_config": 21, "page_perf": 22, "page_disk": 23,
+         "flash": {"HC": {"sql_flash_scan_bandwidth": 135, "sql_read_iops_8k": 5600000, "sql_flash_write_iops_8k": 1842000}, "EF": {"sql_flash_scan_bandwidth": 225, "sql_read_iops_8k": 5600000, "sql_flash_write_iops_8k": 1842000}},
+         "disk": {"sql_disk_bandwidth": 5.4, "sql_disk_iops": 7800}},
+        {"name": "Half Rack", "db_servers": 4, "storage_servers": 7, "storage_ids": ["HC", "EF"], "page_config": 21, "page_perf": 22, "page_disk": 23,
+         "flash": {"HC": {"sql_flash_scan_bandwidth": 315, "sql_read_iops_8k": 11200000, "sql_flash_write_iops_8k": 4298000}, "EF": {"sql_flash_scan_bandwidth": 525, "sql_read_iops_8k": 11200000, "sql_flash_write_iops_8k": 4298000}},
+         "disk": {"sql_disk_bandwidth": 12.5, "sql_disk_iops": 18000}},
+        {"name": "Full Rack", "db_servers": 8, "storage_servers": 14, "storage_ids": ["HC", "EF"], "page_config": 21, "page_perf": 22, "page_disk": 23,
+         "flash": {"HC": {"sql_flash_scan_bandwidth": 630, "sql_read_iops_8k": 22400000, "sql_flash_write_iops_8k": 8596000}, "EF": {"sql_flash_scan_bandwidth": 1050, "sql_read_iops_8k": 22400000, "sql_flash_write_iops_8k": 8596000}},
+         "disk": {"sql_disk_bandwidth": 25, "sql_disk_iops": 36000}}
+      ]
+    },
+    {
+      "model": "X10M", "generation": "X10M", "source": "x10m",
+      "read_iops_tier": "xrmem", "read_iops_tier_basis": "Tabla de rack 'Maximum SQL XRMEM Read IOPS' (p.21)",
+      "limits": {"max_storage_servers_per_rack": 17, "max_hc_storage_servers_per_rack": 16, "max_db_servers_per_rack": 15, "max_servers_per_rack": 19, "min_storage_servers": 3, "page": 19},
+      "network": {"fabric": "RoCE", "ports_per_server": 2, "gbps_per_port": 100, "page": 17},
+      "latency_claims": [{"text": "from 200 µs to less than 17 µs", "page": 4, "us": 17, "condition": "lecturas OLTP desde XRMEM (marketing, 'less than')"}],
+      "servers": [
+        {"id": "DB", "role": "db", "label": "Database Server", "page": 20, "figures": {"db_sql_read_iops_8k": 2800000, "db_sql_write_iops_8k": 2000000}},
+        {"id": "HC", "role": "storage", "label": "Storage Server High Capacity (HC)", "page": 20, "has_hdd": true, "has_flash": true,
+         "hardware": {"cores": 64, "hdd": "12x 22 TB 7,200 RPM", "flash": "4x 6.8 TB NVMe PCIe4.0 performance-optimized", "memory_tier": "1.25 TB XRMEM", "page": 17},
+         "figures": {"sql_flash_scan_bandwidth": 45, "sql_read_iops_8k": 2800000, "sql_flash_write_iops_8k": 916000},
+         "derivations": {"hdd": {"racks": ["Elastic Configuration 1 (Example)", "Elastic Configuration 2 (Example)", "Elastic Configuration (Half Rack)", "Quarter Rack"], "method": "min_per_storage_server"}}},
+        {"id": "EF", "role": "storage", "label": "Storage Server Extreme Flash (EF)", "page": 20, "has_hdd": false, "has_flash": true,
+         "hardware": {"cores": 64, "hdd": "None", "flash": "4x 6.8 TB performance-optimized + 4x 30.72 TB capacity-optimized NVMe", "memory_tier": "1.25 TB XRMEM", "page": 17},
+         "figures": {"sql_flash_scan_bandwidth": 60, "sql_read_iops_8k": 2800000, "sql_flash_write_iops_8k": 916000}},
+        {"id": "XT", "role": "storage", "label": "Storage Server Extended (XT)", "page": 20, "has_hdd": true, "has_flash": false,
+         "hardware": {"cores": 32, "hdd": "12x 22 TB 7,200 RPM", "flash": "None", "page": 18},
+         "figures": {}, "unpublished_note": "El datasheet indica N/A para todas las cifras de rendimiento de XT."},
+        {"id": "HC-EIGHTH", "role": "storage", "label": "Storage Server Eighth Rack High Capacity (HC)", "page": 20, "has_hdd": true, "has_flash": true, "eighth_only": true,
+         "hardware": {"cores": 32, "hdd": "6x 22 TB 7,200 RPM", "flash": "2x 6.8 TB NVMe PCIe4.0", "memory_tier": "576 GB XRMEM", "page": 18},
+         "figures": {"sql_flash_scan_bandwidth": 22.5, "sql_read_iops_8k": 1400000, "sql_flash_write_iops_8k": 458000},
+         "derivations": {"hdd": {"racks": ["Eighth Rack"], "method": "min_per_storage_server"}}}
+      ],
+      "racks": [
+        {"name": "Eighth Rack", "db_servers": 2, "storage_servers": 3, "storage_ids": ["HC-EIGHTH"], "page_config": 18, "page_perf": 21,
+         "flash": {"HC-EIGHTH": {"sql_flash_scan_bandwidth": 67.5, "sql_read_iops_8k": 2800000, "sql_flash_write_iops_8k": 1374000}},
+         "disk": {"sql_disk_bandwidth": 2.7, "sql_disk_iops": 3900}},
+        {"name": "Quarter Rack", "db_servers": 2, "storage_servers": 3, "storage_ids": ["HC", "EF"], "page_config": 18, "page_perf": 21,
+         "flash": {"HC": {"sql_flash_scan_bandwidth": 135, "sql_read_iops_8k": 5600000, "sql_flash_write_iops_8k": 2748000}, "EF": {"sql_flash_scan_bandwidth": 180, "sql_read_iops_8k": 5600000, "sql_flash_write_iops_8k": 2748000}},
+         "disk": {"sql_disk_bandwidth": 5.4, "sql_disk_iops": 7800}},
+        {"name": "Elastic Configuration (Half Rack)", "db_servers": 4, "storage_servers": 7, "storage_ids": ["HC", "EF"], "page_config": 18, "page_perf": 21,
+         "flash": {"HC": {"sql_flash_scan_bandwidth": 315, "sql_read_iops_8k": 11200000, "sql_flash_write_iops_8k": 6412000}, "EF": {"sql_flash_scan_bandwidth": 420, "sql_read_iops_8k": 11200000, "sql_flash_write_iops_8k": 6412000}},
+         "disk": {"sql_disk_bandwidth": 12.5, "sql_disk_iops": 18000}},
+        {"name": "Elastic Configuration 1 (Example)", "db_servers": 9, "storage_servers": 9, "storage_ids": ["HC", "EF"], "page_config": 18, "page_perf": 21,
+         "flash": {"HC": {"sql_flash_scan_bandwidth": 405, "sql_read_iops_8k": 25200000, "sql_flash_write_iops_8k": 8244000}, "EF": {"sql_flash_scan_bandwidth": 540, "sql_read_iops_8k": 25200000, "sql_flash_write_iops_8k": 8244000}},
+         "disk": {"sql_disk_bandwidth": 16, "sql_disk_iops": 23000}},
+        {"name": "Elastic Configuration 2 (Example)", "db_servers": 2, "storage_servers": 16, "storage_servers_by_type": {"HC": 16, "EF": 17}, "storage_ids": ["HC", "EF"], "page_config": 18, "page_perf": 21,
+         "flash": {"HC": {"sql_flash_scan_bandwidth": 720, "sql_read_iops_8k": 5600000, "sql_flash_write_iops_8k": 4000000}, "EF": {"sql_flash_scan_bandwidth": 1020, "sql_read_iops_8k": 5600000, "sql_flash_write_iops_8k": 4000000}},
+         "disk": {"sql_disk_bandwidth": 28.8, "sql_disk_iops": 41600}}
+      ]
+    },
+    {
+      "model": "X11M", "generation": "X11M", "source": "x11m",
+      "read_iops_tier": "xrmem", "read_iops_tier_basis": "Tabla de rack 'Maximum SQL XRMEM Read IOPS' (p.23)",
+      "limits": {"max_storage_servers_per_rack": 17, "max_db_servers_per_rack": 15, "max_servers_per_rack": 19, "min_storage_servers": 3, "min_new_type_normal_redundancy": 2, "min_new_type_high_redundancy": 3, "homogeneous_expansion": true, "page": 21},
+      "network": {"fabric": "RoCE", "ports_per_server": 2, "gbps_per_port": 100, "page": 19},
+      "latency_claims": [{"text": "from 250 microseconds to as low as 14 microseconds", "page": 5, "us": 14, "condition": "lecturas OLTP desde XRMEM (marketing, 'as low as')"}],
+      "servers": [
+        {"id": "DB", "role": "db", "label": "Database Server", "page": 22, "figures": {"db_sql_read_iops_8k": 2800000, "db_sql_write_iops_8k": 2500000}},
+        {"id": "DB-Z", "role": "db", "label": "Database Server-Z", "page": 22, "figures": {"db_sql_read_iops_8k": 1400000, "db_sql_write_iops_8k": 1250000}},
+        {"id": "HC", "role": "storage", "label": "Storage Server High Capacity (HC)", "page": 22, "has_hdd": true, "has_flash": true,
+         "hardware": {"cores": 64, "hdd": "12x 22 TB 7,200 RPM", "flash": "4x 6.8 TB NVMe PCIe 5.0 performance-optimized", "memory_tier": "1,280 GB Exadata RDMA Memory", "page": 19},
+         "figures": {"sql_flash_scan_bandwidth": 100, "sql_rdma_memory_bandwidth": 500, "sql_read_iops_8k": 2800000, "sql_flash_write_iops_8k": 1000000},
+         "derivations": {"hdd": {"racks": ["Elastic Configuration 1 (Example)", "Elastic Configuration 2 (Example)", "Quarter Rack"], "method": "min_per_storage_server"}}},
+        {"id": "EF", "role": "storage", "label": "Storage Server Extreme Flash (EF)", "page": 22, "has_hdd": false, "has_flash": true,
+         "hardware": {"cores": 64, "hdd": "None", "flash": "4x 6.8 TB performance-optimized + 4x 30.72 TB capacity-optimized NVMe", "memory_tier": "1,280 GB Exadata RDMA Memory", "page": 19},
+         "figures": {"sql_flash_scan_bandwidth": 100, "sql_rdma_memory_bandwidth": 500, "sql_read_iops_8k": 2800000, "sql_flash_write_iops_8k": 1000000}},
+        {"id": "HC-Z", "role": "storage", "label": "Storage Server High Capacity-Z (HC-Z)", "page": 22, "has_hdd": true, "has_flash": true,
+         "hardware": {"cores": 32, "hdd": "6x 22 TB 7,200 RPM", "flash": "2x 6.8 TB NVMe PCIe 5.0 performance-optimized", "memory_tier": "576 GB Exadata RDMA Memory", "page": 19},
+         "figures": {"sql_flash_scan_bandwidth": 50, "sql_rdma_memory_bandwidth": 250, "sql_read_iops_8k": 1400000, "sql_flash_write_iops_8k": 500000},
+         "derivations": {"hdd": {"racks": ["Quarter Rack (Database Server-Z)"], "method": "min_per_storage_server", "storage_id": "HC-Z"}}}
+      ],
+      "racks": [
+        {"name": "Quarter Rack", "db_servers": 2, "storage_servers": 3, "storage_ids": ["HC", "EF"], "page_config": 20, "page_perf": 23,
+         "flash": {"HC": {"sql_flash_and_rdma_bandwidth": 1500, "sql_read_iops_8k": 5600000, "sql_flash_write_iops_8k": 3000000}, "EF": {"sql_flash_and_rdma_bandwidth": 1500, "sql_read_iops_8k": 5600000, "sql_flash_write_iops_8k": 3000000}},
+         "disk": {"sql_disk_bandwidth": 5.4, "sql_disk_iops": 7800}},
+        {"name": "Quarter Rack (Database Server-Z)", "db_servers": 2, "db_server_id": "DB-Z", "storage_servers": 3, "storage_ids": ["HC-Z", "HC", "EF"], "page_config": 20, "page_perf": 23,
+         "flash": {"HC-Z": {"sql_flash_and_rdma_bandwidth": 750, "sql_read_iops_8k": 2800000, "sql_flash_write_iops_8k": 1500000}, "HC": {"sql_flash_and_rdma_bandwidth": 1500, "sql_read_iops_8k": 2800000, "sql_flash_write_iops_8k": 2500000}, "EF": {"sql_flash_and_rdma_bandwidth": 1500, "sql_read_iops_8k": 2800000, "sql_flash_write_iops_8k": 2500000}},
+         "disk": {"sql_disk_bandwidth": 2.7, "sql_disk_iops": 3900}, "disk_storage_id": "HC-Z"},
+        {"name": "Elastic Configuration 1 (Example)", "db_servers": 9, "storage_servers": 9, "storage_ids": ["HC", "EF"], "page_config": 20, "page_perf": 23,
+         "flash": {"HC": {"sql_flash_and_rdma_bandwidth": 4500, "sql_read_iops_8k": 25200000, "sql_flash_write_iops_8k": 9000000}, "EF": {"sql_flash_and_rdma_bandwidth": 4500, "sql_read_iops_8k": 25200000, "sql_flash_write_iops_8k": 9000000}},
+         "disk": {"sql_disk_bandwidth": 16, "sql_disk_iops": 23000}},
+        {"name": "Elastic Configuration 2 (Example)", "db_servers": 2, "storage_servers": 17, "storage_ids": ["HC", "EF"], "page_config": 20, "page_perf": 23,
+         "flash": {"HC": {"sql_flash_and_rdma_bandwidth": 8500, "sql_read_iops_8k": 5600000, "sql_flash_write_iops_8k": 5000000}, "EF": {"sql_flash_and_rdma_bandwidth": 8500, "sql_read_iops_8k": 5600000, "sql_flash_write_iops_8k": 5000000}},
+         "disk": {"sql_disk_bandwidth": 30.5, "sql_disk_iops": 44000}}
+      ]
+    }
+  ]
+}
