@@ -90,6 +90,13 @@ def test_no_when_fixed_cells_insufficient():
 def test_insufficient_short_capture():
     [c] = run(fa(hours=0.04), [{"id": "a", "model": "X7-2", "storage_type": "HC", "cells": 3}])
     assert c.verdict == VERDICT_INSUFFICIENT
+    with pytest.raises(ScenarioError):
+        run(fa(hours=0.04), [{"id": "a", "model": "X7-2", "storage_type": "HC"}], min_capture_hours=0)
+    [t] = run(fa(hours=0.04), [{"id": "a", "model": "X7-2", "storage_type": "HC"}], min_capture_hours=0,
+              allow_short_capture_for_testing=True)
+    assert t.operational_approval == "pendiente" and "MODO PRUEBA" in t.warnings[0]
+    assert any("24 h" in p for p in t.approval_pending)
+    assert c.verdict == VERDICT_INSUFFICIENT
     assert any("no apta" in b for b in c.blocking)
     assert all(x.margin is None for x in c.resources) and c.limiting_margin is None and c.partial
 

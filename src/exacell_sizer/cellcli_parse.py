@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Dict, List, Optional, Tuple
@@ -83,6 +84,7 @@ def canonical(d: Decimal) -> str:
     return s
 
 
+@lru_cache(maxsize=65536)
 def parse_timestamp(raw: str) -> Tuple[Optional[int], Optional[str]]:
     """ISO-8601 con zona -> epoch UTC (segundos). Sin zona => error (no se adivina)."""
     if not _TS.match(raw):
@@ -95,6 +97,7 @@ def parse_timestamp(raw: str) -> Tuple[Optional[int], Optional[str]]:
     return int(dt.timestamp()), None
 
 
+@lru_cache(maxsize=65536)
 def epoch_to_utc(epoch: int) -> str:
     return datetime.fromtimestamp(epoch, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 

@@ -58,7 +58,7 @@ DEFAULTS = {
                                               "reserve_pct_during_failure": 0},
     "min_coverage_pct": 95, "min_capture_hours": 24, "accept_incomplete_capture": False,
     "allow_multirack": False, "apply_observed_skew": False, "approximations": [], "tested_capacities": [],
-    "critical_periods_confirmed": False, "candidates": [],
+    "critical_periods_confirmed": False, "candidates": [], "allow_short_capture_for_testing": False,
 }
 
 
@@ -76,6 +76,9 @@ def load_scenario(d: dict) -> dict:
         if v < 0:
             raise ScenarioError(f"{k} no puede ser negativo")
         sc[k] = v
+    if sc["min_capture_hours"] < 24 and not sc["allow_short_capture_for_testing"]:
+        raise ScenarioError("min_capture_hours < 24 solo se admite con allow_short_capture_for_testing=true "
+                            "(una captura corta nunca sirve para aprobar una migración)")
     if sc["reserve_pct"] >= HUNDRED:
         raise ScenarioError("reserve_pct debe ser < 100")
     for k in ("recovery_overhead_pct", "reserve_pct_during_failure"):
@@ -251,6 +254,9 @@ def _quality_gates(src: CaptureAnalysis, dst: Optional[CaptureAnalysis], sc: dic
         warnings.extend(f"[{name}] {w}" for w in a.calendar["warnings"])
     if not sc["critical_periods_confirmed"]:
         warnings.append("Periodos críticos (picos semanales, cierres, backups) no confirmados por el cliente.")
+    if sc["allow_short_capture_for_testing"]:
+        warnings.insert(0, "MODO PRUEBA: se admiten capturas cortas; el resultado no sirve para decidir una compra "
+                           "ni una migración.")
     return blocking, warnings, flags
 
 

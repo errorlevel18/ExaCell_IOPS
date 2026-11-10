@@ -1,0 +1,26 @@
+{
+  "scenario_name": "Consolidación del origen X7-2 en un destino X10M/X11M (EJEMPLO con datos simulados)",
+  "statistic": "max",
+  "combination": "envelope",
+  "align": "utc",
+  "growth_pct": 25,
+  "reserve_pct": 20,
+  "latency_target_us": 1000,
+  "n_minus_1": {"enabled": true, "recovery_overhead_pct": 15, "reserve_pct_during_failure": 0},
+  "min_coverage_pct": 95,
+  "min_capture_hours": 24,
+  "critical_periods_confirmed": false,
+  "approximations": [],
+  "source_system": {"model": "X7-2", "storage_type": "HC"},
+  "destination_current": {"model": "X10M", "storage_type": "HC"},
+  "candidates": [
+    {"id": "X10M-HC-quarter", "model": "X10M", "storage_type": "HC", "rack_config": "Quarter Rack"},
+    {"id": "X10M-HC-elastic", "model": "X10M", "storage_type": "HC",
+     "approximations": ["read_iops_memory_tier_as_flash"]},
+    {"id": "X11M-HC-elastic", "model": "X11M", "storage_type": "HC", "db_servers": 2,
+     "approximations": ["read_iops_memory_tier_as_flash"]},
+    {"id": "X8-HC-aprox", "model": "X8-2", "storage_type": "HC",
+     "approximations": ["X8-2_as_X8M-2", "read_iops_memory_tier_as_flash"]}
+  ],
+  "tested_capacities": []
+}
